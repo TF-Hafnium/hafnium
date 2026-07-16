@@ -93,11 +93,6 @@ static inline bool ffa_versions_are_compatible(enum ffa_version caller,
 
 /* clang-format off */
 
-#define FFA_LOW_32_ID  0x84000060
-#define FFA_HIGH_32_ID 0x8400007F
-#define FFA_LOW_64_ID  0xC4000060
-#define FFA_HIGH_64_ID 0xC400007F
-
 /**
  * FF-A function identifiers.
  * Don't forget to update `ffa_func_name` if you add a new one.
@@ -172,6 +167,12 @@ enum ffa_function : uint32_t {
 	FFA_ABORT_64                        = 0xC4000090,
 	/* FF-A v1.3 */
 	FFA_NS_RES_INFO_GET                 = 0xC400008F,
+
+	/* FF-A v1.3: extended notification ABIs */
+	FFA_NOTIFICATION_BIND2_64           = 0xC4000094,
+	FFA_NOTIFICATION_UNBIND2_64         = 0xC4000095,
+	FFA_NOTIFICATION_SET2_64            = 0xC4000096,
+	FFA_NOTIFICATION_GET2_64            = 0xC4000097,
 };
 
 /**
@@ -305,6 +306,16 @@ static inline const char *ffa_func_name(enum ffa_function func)
 		return "FFA_MEM_PERM_GET_64";
 	case FFA_MEM_PERM_SET_64:
 		return "FFA_MEM_PERM_SET_64";
+
+	/* FF-A v1.3: extended notification ABIs */
+	case FFA_NOTIFICATION_BIND2_64:
+		return "FFA_NOTIFICATION_BIND2_64";
+	case FFA_NOTIFICATION_UNBIND2_64:
+		return "FFA_NOTIFICATION_UNBIND2_64";
+	case FFA_NOTIFICATION_SET2_64:
+		return "FFA_NOTIFICATION_SET2_64";
+	case FFA_NOTIFICATION_GET2_64:
+		return "FFA_NOTIFICATION_GET2_64";
 
 	/* FF-A v1.3 */
 	case FFA_NS_RES_INFO_GET:
