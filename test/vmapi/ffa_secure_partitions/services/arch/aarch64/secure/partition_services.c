@@ -97,6 +97,103 @@ struct ffa_value sp_check_partition_info_rx_cmd(ffa_id_t receiver)
 	return sp_success(own_id, receiver, ret.arg2);
 }
 
+/*
+ * Retrieve `handle` into this SP's RX and return the response's
+ * `fragment_length`, or SIZE_MAX if the retrieve itself failed. Builds the
+ * retrieve request in whichever descriptor format matches this SP's own
+ * negotiated FF-A version.
+ */
+static size_t retrieve_into_rx(ffa_id_t own_id, ffa_memory_handle_t handle,
+			       ffa_id_t mem_sender)
+{
+	void *tx = SERVICE_SEND_BUFFER();
+	struct ffa_value ret;
+	uint32_t msg_size;
+	enum ffa_version ffa_version =
+		hftest_get_context()->partition_manifest.ffa_version;
+
+	if (ffa_version == FFA_VERSION_1_0) {
+		struct ffa_memory_access_v1_0 receiver_acc_v1_0;
+
+		ffa_memory_access_init_v1_0(
+			&receiver_acc_v1_0, own_id, FFA_DATA_ACCESS_RW,
+			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
+		msg_size = ffa_memory_retrieve_request_init_v1_0(
+			tx, handle, mem_sender, &receiver_acc_v1_0, 1, 0,
+			FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE,
+			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			FFA_MEMORY_INNER_SHAREABLE);
+	} else {
+		struct ffa_memory_access receiver_acc;
+		struct ffa_memory_access_impdef impdef =
+			ffa_memory_access_impdef_init(own_id, own_id + 1);
+
+		ffa_memory_access_init(
+			&receiver_acc, own_id, FFA_DATA_ACCESS_RW,
+			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &impdef);
+		msg_size = ffa_memory_retrieve_request_init(
+			tx, handle, mem_sender, &receiver_acc, 1,
+			sizeof(struct ffa_memory_access), 0,
+			FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE,
+			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			FFA_MEMORY_INNER_SHAREABLE);
+	}
+
+	ret = ffa_mem_retrieve_req(msg_size, msg_size);
+	if (ret.func != FFA_MEM_RETRIEVE_RESP_32) {
+		return SIZE_MAX;
+	}
+
+	return ret.arg2;
+}
+
+/*
+ * Verify that the SPMC zeros the unpopulated tail of this SP's RX buffer
+ * after writing a memory retrieve response (FF-A v1.3 section 4.10).
+ *
+ * This SP's RX buffer is mapped read-only to it (the SPMC is the producer
+ * that writes into it), so it can't pre-paint its own RX with a sentinel to
+ * detect stale bytes. Instead, `filler_handle` (a region large enough that
+ * its retrieve response spans more than one FF-A page of non-zero
+ * descriptor bytes, well past where the real response below ends) is
+ * retrieved first to legitimately dirty the buffer. `real_handle` (a
+ * smaller region) is then retrieved, and every byte past its response must
+ * have been cleared by the SPMC even though the filler retrieve just wrote
+ * non-zero content there.
+ */
+struct ffa_value sp_check_retrieve_rx_tail_cmd(
+	ffa_id_t receiver, ffa_id_t mem_sender,
+	ffa_memory_handle_t filler_handle, ffa_memory_handle_t real_handle)
+{
+	ffa_id_t own_id = hf_vm_get_id();
+	const uint8_t *rx = SERVICE_RECV_BUFFER();
+	const size_t rx_size = (size_t)sp_mailbox_page_count * FFA_PAGE_SIZE;
+	size_t fragment_length;
+
+	fragment_length = retrieve_into_rx(own_id, filler_handle, mem_sender);
+	if (fragment_length == SIZE_MAX) {
+		return sp_error(own_id, receiver, FFA_INVALID_PARAMETERS);
+	}
+	ffa_rx_release();
+
+	fragment_length = retrieve_into_rx(own_id, real_handle, mem_sender);
+	if (fragment_length == SIZE_MAX) {
+		return sp_error(own_id, receiver, FFA_INVALID_PARAMETERS);
+	}
+
+	/* Bytes past the retrieve response must have been zeroed (§4.10). */
+	for (size_t i = fragment_length; i < rx_size; i++) {
+		if (rx[i] != 0) {
+			ffa_rx_release();
+			return sp_error(own_id, receiver,
+					FFA_INVALID_PARAMETERS);
+		}
+	}
+
+	ffa_rx_release();
+	return sp_success(own_id, receiver, 0);
+}
+
 struct ffa_value sp_req_echo_cmd(ffa_id_t test_source, uint32_t val1,
 				 uint32_t val2, uint32_t val3, uint32_t val4)
 {

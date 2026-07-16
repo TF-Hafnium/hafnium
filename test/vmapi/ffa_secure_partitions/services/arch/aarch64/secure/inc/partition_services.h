@@ -247,6 +247,22 @@ enum sp_cmd {
 	SP_FFA_MEM_LEND_RETRIEVE_CMD,
 
 	/**
+	 * Request SP to retrieve two previously shared regions in turn and
+	 * verify that the SPMC zeroed the unpopulated tail of the RX buffer
+	 * after writing the second retrieve response (FF-A v1.3 section
+	 * 4.10). The first ("filler") retrieve dirties the RX with non-zero
+	 * descriptor bytes past where the second ("real") retrieve response
+	 * ends, so the check is meaningful.
+	 * val1: low 32 bits of the filler region's memory handle
+	 * val2: high 32 bits of the filler region's memory handle
+	 * val3: low 32 bits of the real region's memory handle
+	 * val4: high 32 bits of the real region's memory handle
+	 * The sender VM ID is taken from the direct message's sender field.
+	 * Returns SP_SUCCESS if the tail is all-zero, SP_ERROR otherwise.
+	 */
+	SP_CHECK_RETRIEVE_RX_TAIL_CMD,
+
+	/**
 	 * Request SP to relinquish the memory region it last retrieved
 	 * through `SP_FFA_MEM_LEND_RETRIEVE_CMD`, so the lender can reclaim
 	 * it.
@@ -295,6 +311,30 @@ static inline struct ffa_value sp_check_partition_info_rx_cmd_send(
 }
 
 struct ffa_value sp_check_partition_info_rx_cmd(ffa_id_t receiver);
+
+/**
+ * Command to request SP to retrieve `filler_handle` (a region large enough
+ * to dirty every byte of the SP's RX with non-zero content), then retrieve
+ * `real_handle` and verify the SPMC zeroed the unpopulated RX tail past the
+ * second response (FF-A v1.3 section 4.10). The SP can't pre-paint its own
+ * RX with a sentinel (the RX buffer is mapped read-only to the owning
+ * endpoint), so the filler retrieve is what dirties the tail region ahead of
+ * the real retrieve being checked. Both handles must have been sent by the
+ * same `ffa_sender()` of this direct message.
+ */
+static inline struct ffa_value sp_check_retrieve_rx_tail_cmd_send(
+	ffa_id_t sender, ffa_id_t receiver, ffa_memory_handle_t filler_handle,
+	ffa_memory_handle_t real_handle)
+{
+	return ffa_msg_send_direct_req(
+		sender, receiver, SP_CHECK_RETRIEVE_RX_TAIL_CMD,
+		(uint32_t)filler_handle, (uint32_t)(filler_handle >> 32),
+		(uint32_t)real_handle, (uint32_t)(real_handle >> 32));
+}
+
+struct ffa_value sp_check_retrieve_rx_tail_cmd(
+	ffa_id_t receiver, ffa_id_t mem_sender,
+	ffa_memory_handle_t filler_handle, ffa_memory_handle_t real_handle);
 
 /**
  * Command to request SP to run echo test with second SP.

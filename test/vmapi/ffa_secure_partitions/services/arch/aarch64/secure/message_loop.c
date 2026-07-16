@@ -289,6 +289,16 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 		res = sp_ffa_mem_lend_retrieve_cmd(ffa_sender(res), handle);
 		break;
 	}
+	case SP_CHECK_RETRIEVE_RX_TAIL_CMD: {
+		ffa_id_t test_source = ffa_sender(res);
+		ffa_memory_handle_t filler_handle =
+			ffa_assemble_handle(res.arg4, res.arg5);
+		ffa_memory_handle_t real_handle =
+			ffa_assemble_handle(res.arg6, res.arg7);
+		res = sp_check_retrieve_rx_tail_cmd(test_source, test_source,
+						    filler_handle, real_handle);
+		break;
+	}
 	case SP_REQ_ECHO_CMD:
 		res = sp_req_echo_cmd(ffa_sender(res), res.arg4, res.arg5,
 				      res.arg6, res.arg7);
