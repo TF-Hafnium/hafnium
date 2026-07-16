@@ -761,6 +761,13 @@ As part of the FF-A v1.2 support, the following interfaces were added:
 - ``FFA_MSG_SEND_DIRECT_RESP2``
 - ``FFA_CONSOLE_LOG``
 
+As part of the FF-A v1.3 support, the following interfaces were added:
+
+- ``FFA_NOTIFICATION_BIND2``
+- ``FFA_NOTIFICATION_UNBIND2``
+- ``FFA_NOTIFICATION_SET2``
+- ``FFA_NOTIFICATION_GET2``
+
 FFA_VERSION
 ~~~~~~~~~~~
 
@@ -1181,8 +1188,13 @@ communication mechanism with non-blocking semantics. It allows for one FF-A
 endpoint to signal another for service provision, without hindering its current
 progress.
 
-Hafnium currently supports 64 notifications. The IDs of each notification define
-a position in a 64-bit bitmap.
+The legacy notification interfaces support 64 VM and SP notification IDs
+per endpoint. The FF-A v1.3 extended notification interfaces allow Hafnium to
+support up to 384 VM and SP notification IDs per endpoint, represented using
+six 64-bit words. FF-A v1.3 also expands the Hypervisor and SPMC framework
+notification bitmaps from 32 to 64 notification IDs each.
+An FF-A component can use ``FFA_FEATURES`` with notification Feature ID ``0x4``
+to discover the VM and SP notification counts advertised by Hafnium.
 
 The signaling of notifications can interchangeably happen between NWd and SWd
 FF-A endpoints.
