@@ -411,6 +411,18 @@ enum ffa_notification_feature_flags : uint32_t {
 	FFA_NOTIFY_FEAT_NO_PER_VCPU_SP = (1U << 1),
 };
 
+/* FF-A v1.3: notification count encoding in FFA_FEATURES (feature 0x4). */
+#define FFA_NOTIFICATION_COUNT_BASE 64U
+#define FFA_NOTIFICATION_COUNT_VM_SHIFT 2U
+#define FFA_NOTIFICATION_COUNT_SP_SHIFT 11U
+
+/* 9-bit mask for VM bits[10:2] and SP bits[19:11] */
+#define FFA_NOTIFICATION_COUNT_MASK 0x1FFU
+
+#define FFA_NOTIFICATION_COUNT_ENCODE(count)                 \
+	(((uint32_t)(count) - FFA_NOTIFICATION_COUNT_BASE) & \
+	 FFA_NOTIFICATION_COUNT_MASK)
+
 /** Constants for bitmasks used in FFA_FEATURES. */
 #define FFA_FEATURES_FEATURE_BIT (31U)
 #define FFA_FEATURES_FEATURE_MBZ_HI_BIT (30U)

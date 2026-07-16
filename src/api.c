@@ -2921,6 +2921,17 @@ static struct ffa_value ffa_features_function(uint32_t func,
 
 		return api_ffa_feature_success(0);
 
+	/* FF-A v1.3 features. */
+	case FFA_NOTIFICATION_BIND2_64:
+	case FFA_NOTIFICATION_UNBIND2_64:
+	case FFA_NOTIFICATION_SET2_64:
+	case FFA_NOTIFICATION_GET2_64:
+		if (FFA_VERSION_1_3 > FFA_VERSION_COMPILED) {
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
+
+		return api_ffa_feature_success(0);
+
 	case FFA_NS_RES_INFO_GET:
 		if (FFA_VERSION_1_3 > FFA_VERSION_COMPILED) {
 			return ffa_error(FFA_NOT_SUPPORTED);
@@ -3112,11 +3123,17 @@ static struct ffa_value ffa_features_feature(enum ffa_feature_id feature,
 		 * Per-vCPU notifications are optional.
 		 *
 		 * Return value encoding (w2):
-		 * Bit[0]   = 1 (per-vCPU NOT supported for VMs)
-		 * Bit[1]   = 1 (per-vCPU NOT supported for SPs)
-		 * Bits[10:2], Bits[19:11] = 0 (MBZ at NS physical instance)
-		 * Bits[31:20] = 0 (MBZ)
+		 * Bit[0]     = 1: per-vCPU notifications unsupported for VMs;
+		 * Bit[1]     = 1: per-vCPU notifications unsupported for SPs;
+		 * Bits[10:2] = VM notification count above the legacy base
+		 *               of 64; MBZ at the Non-secure physical
+		 *               interface;
+		 * Bits[19:11] = SP notification count above the legacy base
+		 *                of 64;
+		 * Bits[31:20] = MBZ.
 		 */
+		const uint32_t encoded_notification_count =
+			FFA_NOTIFICATION_COUNT_ENCODE(MAX_FFA_NOTIFICATIONS);
 		uint32_t notification_feature_flags = 0;
 
 		if (FFA_VERSION_1_3 > FFA_VERSION_COMPILED) {
@@ -3125,6 +3142,28 @@ static struct ffa_value ffa_features_feature(enum ffa_feature_id feature,
 
 		notification_feature_flags |= FFA_NOTIFY_FEAT_NO_PER_VCPU_VM;
 		notification_feature_flags |= FFA_NOTIFY_FEAT_NO_PER_VCPU_SP;
+
+		/*
+		 * The notification-count fields were introduced in FF-A v1.3.
+		 * Keep them zero for callers using an earlier version.
+		 */
+		if (current->vm->ffa_version >= FFA_VERSION_1_3) {
+			/*
+			 * The VM count field is Reserved (SBZ) at the
+			 * Non-secure physical interface.
+			 */
+			if (vm_id_is_current_world(current->vm->id)) {
+				notification_feature_flags |=
+					encoded_notification_count
+					<< FFA_NOTIFICATION_COUNT_VM_SHIFT;
+			}
+
+			/* SP count field is valid at every v1.3 interface. */
+			notification_feature_flags |=
+				encoded_notification_count
+				<< FFA_NOTIFICATION_COUNT_SP_SHIFT;
+		}
+
 		return api_ffa_feature_success(notification_feature_flags);
 	}
 	/* Platform specific feature support. */
