@@ -303,7 +303,19 @@ struct ffa_value ffa_indirect_msg_send(ffa_id_t sender_vm_id,
 	}
 
 	/* Copy data. */
-	memcpy_s(to->mailbox.recv, FFA_MSG_PAYLOAD_MAX, from_msg, size);
+	memcpy_s(to->mailbox.recv, to->mailbox.buf_size, from_msg, size);
+
+	/*
+	 * Zero the unpopulated tail of the RX buffer (FF-A v1.3 section
+	 * 4.10): the hypervisor is a higher-EL producer writing to a
+	 * lower-EL consumer's buffer and must not leak stale content.
+	 */
+	if (size < to->mailbox.buf_size) {
+		memset_s((char *)to->mailbox.recv + size,
+			 to->mailbox.buf_size - size, 0,
+			 to->mailbox.buf_size - size);
+	}
+
 	to->mailbox.recv_size = size;
 	to->mailbox.recv_sender = sender_vm_id;
 	to->mailbox.recv_func = FFA_MSG_SEND_32;

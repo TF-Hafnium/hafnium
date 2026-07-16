@@ -3784,6 +3784,24 @@ static void ffa_hypervisor_memory_retrieve_request_undo(
 	share_state->hypervisor_fragment_count--;
 }
 
+/*
+ * Zero the unpopulated tail of the RX buffer after writing a fragment of a
+ * memory retrieve response (FF-A v1.3 section 4.10): the SPMC is a
+ * higher-EL producer writing to a lower-EL consumer's buffer and must not
+ * leak stale content. This must be done after every fragment, not just the
+ * last, since the receiver's mailbox is readable as soon as the fragment is
+ * copied in.
+ */
+static void ffa_memory_retrieve_zero_rx_tail(struct vm_locked to_locked,
+					     uint32_t fragment_length)
+{
+	if (fragment_length < to_locked.vm->mailbox.buf_size) {
+		memset_s((char *)to_locked.vm->mailbox.recv + fragment_length,
+			 to_locked.vm->mailbox.buf_size - fragment_length, 0,
+			 to_locked.vm->mailbox.buf_size - fragment_length);
+	}
+}
+
 static struct ffa_value ffa_partition_retrieve_request(
 	struct share_states_locked share_states,
 	struct ffa_memory_share_state *share_state, struct vm_locked to_locked,
@@ -3938,6 +3956,8 @@ static struct ffa_value ffa_partition_retrieve_request(
 		return ffa_error(FFA_ABORTED);
 	}
 
+	ffa_memory_retrieve_zero_rx_tail(to_locked, fragment_length);
+
 	if (is_retrieve_complete) {
 		ffa_memory_retrieve_complete(share_states, share_state);
 	}
@@ -4004,6 +4024,8 @@ static struct ffa_value ffa_hypervisor_retrieve_request(
 
 		return ffa_error(FFA_ABORTED);
 	}
+
+	ffa_memory_retrieve_zero_rx_tail(to_locked, fragment_length);
 
 	ffa_memory_retrieve_complete_from_hyp(share_state);
 
@@ -4287,6 +4309,8 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 
 	to_locked.vm->mailbox.recv_func = FFA_MEM_FRAG_TX_32;
 	to_locked.vm->mailbox.state = MAILBOX_STATE_FULL;
+
+	ffa_memory_retrieve_zero_rx_tail(to_locked, fragment_length);
 
 	if (!continue_ffa_hyp_mem_retrieve_req) {
 		share_state->retrieved_fragment_count[receiver_index] +=

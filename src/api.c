@@ -5876,12 +5876,25 @@ static struct ffa_value api_ffa_ns_res_info_get_copy_data(
 	from_locked->vm->mailbox.recv_func = FFA_NS_RES_INFO_GET;
 	from_locked->vm->mailbox.recv_size = *current_size;
 	from_locked->vm->mailbox.recv_sender = HF_VM_ID_BASE;
-	if (!memcpy_trapped(rx_buffer, *current_size,
+	if (!memcpy_trapped(rx_buffer, from_locked->vm->mailbox.buf_size,
 			    ffa_ns_res_state.desc_fragments[resp_index],
 			    *current_size)) {
 		dlog_error("%s: Failed to copy to RX buffer of VM %x\n",
 			   __func__, from_locked->vm->id);
 		return ffa_error(FFA_ABORTED);
+	}
+
+	/*
+	 * Zero the unpopulated tail of the RX buffer (FF-A v1.3 section
+	 * 4.10): the hypervisor/SPMC is a higher-EL producer writing to a
+	 * lower-EL consumer's buffer and must not leak stale content. Each
+	 * call writes at most one page starting at the base of the RX
+	 * buffer, so the tail includes the rest of a multi-page mailbox.
+	 */
+	if (*current_size < from_locked->vm->mailbox.buf_size) {
+		memset_s((char *)rx_buffer + *current_size,
+			 from_locked->vm->mailbox.buf_size - *current_size, 0,
+			 from_locked->vm->mailbox.buf_size - *current_size);
 	}
 
 	/* Determine if we are done sending data. */
