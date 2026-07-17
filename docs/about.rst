@@ -4,8 +4,9 @@ About
 Hafnium is an open governance community project. All contributions are
 ultimately merged by one of the active maintainers listed below.
 
-Active Maintainers
-------------------
+Maintainers
+-----------
+*   Manish Badarkhe <manish.badarkhe@arm.com>
 
 *   Madhukar Pappireddy <madhukar.pappireddy@arm.com>
 
