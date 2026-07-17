@@ -42,7 +42,7 @@ struct ffa_value arch_memory_protect(paddr_t begin, paddr_t end,
 	case SMCCC_OK:
 		/* Protect call ended with success. */
 		break;
-	case SMCCC_DENIED: {
+	case PLAT_PROTECT_MEM_DENIED: {
 		/* Denied the operation due to state of memory. */
 		paddr_t last_protected = pa_init(ret.arg1);
 
@@ -56,7 +56,7 @@ struct ffa_value arch_memory_protect(paddr_t begin, paddr_t end,
 
 		return ffa_error(FFA_DENIED);
 	}
-	case SMCCC_INVALID:
+	case PLAT_PROTECT_MEM_INVALID:
 		/* Invalid parameters. */
 		dlog_verbose(
 			"%s: invalid values for protecting memory at "

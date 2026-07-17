@@ -37,9 +37,15 @@
 /* SMCCC return codes. */
 #define SMCCC_OK 0
 
-/* NOT defined by the SMCCC */
-#define SMCCC_DENIED UINT64_C(-3)
-#define SMCCC_INVALID UINT64_C(-4)
+/* Standard Arm Architecture Service return codes. */
+#define SMCCC_SUCCESS             ((uint32_t)0)
+#define SMCCC_NOT_SUPPORTED       UINT32_C(-1)
+#define SMCCC_NOT_REQUIRED        UINT32_C(-2)
+#define SMCCC_INVALID_PARAMETER   UINT32_C(-3)
+
+/* Platform-specific monitor return codes for PLAT_PROTECT_MEM_64. */
+#define PLAT_PROTECT_MEM_DENIED   UINT64_C(-3)
+#define PLAT_PROTECT_MEM_INVALID  UINT64_C(-4)
 
 /*
  * TODO: Trusted application call: 0x30000000 - 0x31000000

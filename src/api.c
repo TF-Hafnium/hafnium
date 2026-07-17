@@ -44,6 +44,8 @@
 #include "vmapi/hf/ffa.h"
 #include "vmapi/hf/ffa_v1_0.h"
 
+#include "smc.h"
+
 static_assert(sizeof(struct ffa_partition_info_v1_0) == 8,
 	      "Partition information descriptor size doesn't match the one in "
 	      "the FF-A 1.0 EAC specification, Table 82.");
@@ -2643,11 +2645,10 @@ uint32_t api_interrupt_get(struct vcpu_locked current_locked)
 
 /**
  * Negotiate the FF-A version to be used for this FF-A instance.
- * See section 13.2 of the FF-A v1.2 ALP1 spec.
  *
  * Returns Hafnium's version number (`FFA_VERSION_COMPILED`) on success.
- * Returns `FFA_NOT_SUPPORTED` on error:
- * - The version is invalid (highest bit set).
+ * Returns `SMCCC_INVALID_PARAMETER` if the version is invalid (highest bit
+ * set). Returns `SMCCC_NOT_SUPPORTED` if:
  * - The requested version is incompatible.
  * - The version has already been negotiated and cannot be changed.
  */
@@ -2657,7 +2658,10 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 	static_assert(sizeof(enum ffa_version) == 4,
 		      "enum ffa_version must be 4 bytes wide");
 
-	const struct ffa_value error = {.func = FFA_NOT_SUPPORTED};
+	const struct ffa_value error = {.func = SMCCC_NOT_SUPPORTED};
+	const struct ffa_value invalid_parameter = {
+		.func = SMCCC_INVALID_PARAMETER,
+	};
 	struct vm_locked current_vm_locked;
 
 	uint16_t compiled_major = ffa_version_get_major(FFA_VERSION_COMPILED);
@@ -2672,7 +2676,7 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 			"FFA_VERSION: requested version %#x is invalid "
 			"(highest bit must be zero)\n",
 			requested_version);
-		return error;
+		return invalid_parameter;
 	}
 
 	requested_major = ffa_version_get_major(requested_version);

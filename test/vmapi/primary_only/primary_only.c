@@ -15,6 +15,7 @@
 
 #include "vmapi/hf/call.h"
 
+#include "smc.h"
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
@@ -196,7 +197,7 @@ TEST(ffa, ffa_version)
 /** Ensures that an invalid call to FFA_VERSION gets an error back. */
 TEST(ffa, ffa_version_invalid)
 {
-	EXPECT_EQ((enum ffa_error)ffa_version(0x80000000), FFA_NOT_SUPPORTED);
+	EXPECT_EQ((uint32_t)ffa_version(0x80000000), SMCCC_INVALID_PARAMETER);
 }
 
 static bool v1_0_or_later(void)

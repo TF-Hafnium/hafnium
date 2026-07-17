@@ -15,6 +15,7 @@
 #include "vmapi/hf/ffa.h"
 
 #include "../msr.h"
+#include "smc.h"
 #include "test/hftest.h"
 #include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
@@ -1169,9 +1170,9 @@ TEST(ffa_version, succeeds_older_compatible_version)
  */
 TEST(ffa_version, fails_highest_bit_set)
 {
-	EXPECT_EQ((enum ffa_error)ffa_version(FFA_VERSION_COMPILED |
-					      FFA_VERSION_MBZ_BIT),
-		  FFA_NOT_SUPPORTED);
+	EXPECT_EQ((uint32_t)ffa_version(FFA_VERSION_COMPILED |
+					FFA_VERSION_MBZ_BIT),
+		  SMCCC_INVALID_PARAMETER);
 }
 
 /**

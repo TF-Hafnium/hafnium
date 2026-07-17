@@ -10,6 +10,7 @@ import("//test/hftest/args.gni")
 # Tests with no secondary VMs.
 vm_kernel("secure_partition_test_vm") {
   testonly = true
+  public_configs = [ "//src/arch/aarch64:config" ]
 
   sources = [ "secure_partition.c" ]
 
