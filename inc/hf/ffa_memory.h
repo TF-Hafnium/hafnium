@@ -21,12 +21,14 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 
 struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 				 struct ffa_memory_region *memory_region,
+				 size_t memory_region_alloc_size,
 				 int32_t fragment_offset_delta,
 				 uint32_t memory_share_length,
 				 uint32_t fragment_length, uint32_t share_func);
 struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 					  void *fragment,
 					  uint32_t fragment_length,
+					  size_t fragment_size,
 					  ffa_memory_handle_t handle);
 struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 				     struct ffa_memory_region *retrieve_request,
@@ -53,5 +55,5 @@ bool ffa_memory_get_share_states_info(struct ffa_address_map_desc *amd,
 ffa_amd_permissions_t ffa_memory_amd_permissions_from_mm_mode(mm_mode_t mode,
 							      bool privileged);
 
-void *ffa_memory_fragment_alloc(void);
-void ffa_memory_fragment_free(void *ptr);
+void *ffa_memory_fragment_alloc(size_t size);
+void ffa_memory_fragment_free(void *ptr, size_t size);

@@ -73,6 +73,15 @@ struct ffa_memory_share_state {
 	uint32_t fragment_constituent_counts[MAX_FRAGMENTS];
 
 	/**
+	 * The size, in bytes, of the allocation backing each fragment (index
+	 * 0 covers `memory_region` and `fragments[0]`, which share the same
+	 * allocation). Must be passed back to `ffa_memory_fragment_free()`
+	 * for the matching fragment, since fragments are no longer always
+	 * exactly one page.
+	 */
+	size_t fragment_alloc_sizes[MAX_FRAGMENTS];
+
+	/**
 	 * The number of valid elements in the `fragments` and
 	 * `fragment_constituent_counts` arrays.
 	 */
@@ -154,7 +163,8 @@ struct share_states_locked {
 
 struct ffa_memory_share_state *share_state_allocate(
 	struct share_states_locked share_states, uint32_t share_func,
-	struct ffa_memory_region *memory_region, int32_t fragment_offset_delta,
+	struct ffa_memory_region *memory_region,
+	size_t memory_region_alloc_size, int32_t fragment_offset_delta,
 	uint32_t fragment_length, ffa_memory_handle_t handle);
 struct share_states_locked share_states_lock(void);
 void share_states_unlock(struct share_states_locked *share_states);

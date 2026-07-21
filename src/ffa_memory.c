@@ -74,7 +74,8 @@ static uint32_t ffa_composite_constituent_offset(
  */
 struct ffa_memory_share_state *share_state_allocate(
 	struct share_states_locked share_states, uint32_t share_func,
-	struct ffa_memory_region *memory_region, int32_t fragment_offset_delta,
+	struct ffa_memory_region *memory_region,
+	size_t memory_region_alloc_size, int32_t fragment_offset_delta,
 	uint32_t fragment_length, ffa_memory_handle_t handle)
 {
 	assert(share_states.share_states != NULL);
@@ -105,6 +106,8 @@ struct ffa_memory_share_state *share_state_allocate(
 				 ffa_composite_constituent_offset(memory_region,
 								  0)) /
 				sizeof(struct ffa_memory_region_constituent);
+			allocated_state->fragment_alloc_sizes[0] =
+				memory_region_alloc_size;
 			allocated_state->sending_complete = false;
 			for (uint32_t j = 0; j < MAX_MEM_SHARE_RECIPIENTS;
 			     ++j) {
@@ -173,16 +176,19 @@ struct ffa_memory_share_state *share_state_get(
 	return NULL;
 }
 
-/* Allocate a page for the FF-A memory region descriptors. */
-void *ffa_memory_fragment_alloc(void)
+/* Allocate memory for the FF-A memory region descriptors. */
+void *ffa_memory_fragment_alloc(size_t size)
 {
-	return memory_alloc(PAGE_SIZE);
+	return memory_alloc(size);
 }
 
-/* Free a page for the FF-A memory region descriptors. */
-void ffa_memory_fragment_free(void *ptr)
+/*
+ * Free memory previously returned by `ffa_memory_fragment_alloc()`. `size`
+ * must match the size passed to the corresponding alloc call.
+ */
+void ffa_memory_fragment_free(void *ptr, size_t size)
 {
-	CHECK(memory_free(ptr, PAGE_SIZE));
+	CHECK(memory_free(ptr, size));
 }
 
 /** Marks a share state as unallocated. */
@@ -196,20 +202,24 @@ void share_state_free(struct share_states_locked share_states,
 	share_state->share_func = 0;
 	share_state->sending_complete = false;
 
-	ffa_memory_fragment_free(share_state->memory_region);
+	ffa_memory_fragment_free(share_state->memory_region,
+				 share_state->fragment_alloc_sizes[0]);
 	share_state->memory_region = NULL;
 
 	/*
-	 * First fragment is part of the same page as the `memory_region`, so it
-	 * doesn't need to be freed separately.
+	 * First fragment is part of the same allocation as the
+	 * `memory_region`, so it doesn't need to be freed separately.
 	 */
 	share_state->fragments[0] = NULL;
 	share_state->fragment_constituent_counts[0] = 0;
+	share_state->fragment_alloc_sizes[0] = 0;
 
 	for (i = 1; i < share_state->fragment_count; ++i) {
-		ffa_memory_fragment_free(share_state->fragments[i]);
+		ffa_memory_fragment_free(share_state->fragments[i],
+					 share_state->fragment_alloc_sizes[i]);
 		share_state->fragments[i] = NULL;
 		share_state->fragment_constituent_counts[i] = 0;
+		share_state->fragment_alloc_sizes[i] = 0;
 	}
 
 	share_state->fragment_count = 0;
@@ -2395,7 +2405,7 @@ bool memory_region_receivers_from_other_world(
  *
  * Assumes that the caller has already found and locked the sender VM and copied
  * the memory region descriptor from the sender's TX buffer to a freshly
- * allocated page from Hafnium's internal pool. The caller must have also
+ * allocated buffer from Hafnium's internal pool. The caller must have also
  * validated that the receiver VM ID is valid.
  *
  * This function takes ownership of the `memory_region` passed in and will free
@@ -2403,6 +2413,7 @@ bool memory_region_receivers_from_other_world(
  */
 struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 				 struct ffa_memory_region *memory_region,
+				 size_t memory_region_alloc_size,
 				 int32_t fragment_offset_delta,
 				 uint32_t memory_share_length,
 				 uint32_t fragment_length, uint32_t share_func)
@@ -2420,7 +2431,8 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 				       memory_share_length, fragment_length,
 				       share_func);
 	if (ret.func != FFA_SUCCESS_32) {
-		ffa_memory_fragment_free(memory_region);
+		ffa_memory_fragment_free(memory_region,
+					 memory_region_alloc_size);
 		return ret;
 	}
 
@@ -2443,7 +2455,8 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 	default:
 		dlog_verbose("Unknown share func %#x (%s)\n", share_func,
 			     ffa_func_name(share_func));
-		ffa_memory_fragment_free(memory_region);
+		ffa_memory_fragment_free(memory_region,
+					 memory_region_alloc_size);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -2455,12 +2468,14 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 	 * get it back.
 	 */
 	share_state = share_state_allocate(
-		share_states, share_func, memory_region, fragment_offset_delta,
+		share_states, share_func, memory_region,
+		memory_region_alloc_size, fragment_offset_delta,
 		fragment_length, FFA_MEMORY_HANDLE_INVALID);
 	if (share_state == NULL) {
 		dlog_verbose("Failed to allocate share state.\n");
 		ret = ffa_error(FFA_NO_MEMORY);
-		ffa_memory_fragment_free(memory_region);
+		ffa_memory_fragment_free(memory_region,
+					 memory_region_alloc_size);
 		goto out;
 	}
 
@@ -2511,7 +2526,7 @@ out:
  *
  * Assumes that the caller has already found and locked the sender VM and copied
  * the memory region descriptor from the sender's TX buffer to a freshly
- * allocated page from Hafnium's internal pool.
+ * allocated buffer from Hafnium's internal pool.
  *
  * This function takes ownership of the `fragment` passed in; it must not be
  * freed by the caller.
@@ -2519,6 +2534,7 @@ out:
 struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 					  void *fragment,
 					  uint32_t fragment_length,
+					  size_t fragment_size,
 					  ffa_memory_handle_t handle)
 {
 	struct share_states_locked share_states = share_states_lock();
@@ -2557,6 +2573,8 @@ struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 	share_state->fragments[share_state->fragment_count] = fragment;
 	share_state->fragment_constituent_counts[share_state->fragment_count] =
 		fragment_length / sizeof(struct ffa_memory_region_constituent);
+	share_state->fragment_alloc_sizes[share_state->fragment_count] =
+		fragment_size;
 	share_state->fragment_count++;
 
 	/* Check whether the memory send operation is now ready to complete. */
@@ -2589,7 +2607,7 @@ struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 	goto out;
 
 out_free_fragment:
-	ffa_memory_fragment_free(fragment);
+	ffa_memory_fragment_free(fragment, fragment_size);
 
 out:
 	share_states_unlock(&share_states);

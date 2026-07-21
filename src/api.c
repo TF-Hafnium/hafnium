@@ -3746,7 +3746,7 @@ static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 	 * Earlier we checked that the fragment_length_v1_1 would not be larger
 	 * than a page.
 	 */
-	memory_region_v1_1 = ffa_memory_fragment_alloc();
+	memory_region_v1_1 = ffa_memory_fragment_alloc(MM_PPOOL_ENTRY_SIZE);
 
 	if (memory_region_v1_1 == NULL) {
 		return ffa_error(FFA_NO_MEMORY);
@@ -3815,7 +3815,7 @@ static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 	memcpy_s(allocated, MM_PPOOL_ENTRY_SIZE, memory_region_v1_1,
 		 *fragment_length);
 
-	ffa_memory_fragment_free(memory_region_v1_1);
+	ffa_memory_fragment_free(memory_region_v1_1, MM_PPOOL_ENTRY_SIZE);
 
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
@@ -3829,6 +3829,7 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	const void *from_msg;
 	size_t from_buf_size;
 	void *allocated_entry;
+	size_t allocated_entry_size;
 	struct ffa_memory_region *memory_region = NULL;
 	struct ffa_value ret;
 	bool targets_other_world = false;
@@ -3867,24 +3868,39 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
+	/*
+	 * FF-A v1.0 senders go through
+	 * `api_ffa_memory_transaction_descriptor_v1_1_from_v1_0()` below,
+	 * which assumes the whole first fragment fits in a single FF-A page;
+	 * keep that path's existing one-page cap. Later FF-A versions can use
+	 * a fragment as large as the sender's own TX buffer.
+	 */
 	if (fragment_length > from_buf_size ||
-	    fragment_length > MM_PPOOL_ENTRY_SIZE) {
+	    (ffa_version == FFA_VERSION_1_0 &&
+	     fragment_length > FFA_PAGE_SIZE)) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/*
-	 * Copy the memory region descriptor to a fresh page from the memory
-	 * pool. This prevents the sender from changing it underneath us, and
-	 * also lets us keep it around in the share state table if needed.
+	 * Copy the memory region descriptor to a fresh allocation from the
+	 * memory pool, sized to the incoming fragment. This prevents the
+	 * sender from changing it underneath us, and also lets us keep it
+	 * around in the share state table if needed. FF-A v1.0 senders need
+	 * `MM_PPOOL_ENTRY_SIZE`, not just `FFA_PAGE_SIZE`, since the v1.0->v1.1
+	 * descriptor conversion below (and its `memcpy_s()` bound) may expand
+	 * the descriptor beyond the incoming fragment's size.
 	 */
-	allocated_entry = ffa_memory_fragment_alloc();
+	allocated_entry_size = (ffa_version == FFA_VERSION_1_0)
+				       ? MM_PPOOL_ENTRY_SIZE
+				       : fragment_length;
+	allocated_entry = ffa_memory_fragment_alloc(allocated_entry_size);
 
 	if (allocated_entry == NULL) {
 		dlog_verbose("Failed to allocate memory region copy.\n");
 		return ffa_error(FFA_NO_MEMORY);
 	}
 
-	if (!memcpy_trapped(allocated_entry, MM_PPOOL_ENTRY_SIZE, from_msg,
+	if (!memcpy_trapped(allocated_entry, allocated_entry_size, from_msg,
 			    fragment_length)) {
 		dlog_error(
 			"%s: Failed to copy FF-A memory region descriptor.\n",
@@ -3977,13 +3993,22 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	}
 
 	if (targets_other_world) {
+		/*
+		 * `ffa_memory_other_world_mem_send()` is responsible for
+		 * enforcing any limit specific to how this build forwards
+		 * memory send messages to the other world (e.g. the
+		 * hypervisor build's fixed one-page hypervisor<->SPMC
+		 * channel); it differs between the hypervisor and SPMC
+		 * builds, so it can't be checked generically here.
+		 */
 		ret = ffa_memory_other_world_mem_send(
-			from, share_func, &memory_region, fragment_offset_delta,
-			length, fragment_length_new);
+			from, share_func, &memory_region, allocated_entry_size,
+			fragment_offset_delta, length, fragment_length_new);
 	} else {
 		struct vm_locked from_locked = vm_lock(from);
 
 		ret = ffa_memory_send(from_locked, memory_region,
+				      allocated_entry_size,
 				      fragment_offset_delta, length,
 				      fragment_length_new, share_func);
 		/*
@@ -3997,7 +4022,7 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 
 out:
 	if (memory_region != NULL) {
-		CHECK(memory_free(memory_region, PAGE_SIZE));
+		CHECK(memory_free(memory_region, allocated_entry_size));
 	}
 
 	return ret;
@@ -4374,6 +4399,7 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 	const void *from_msg;
 	size_t from_buf_size;
 	void *fragment_copy;
+	bool targets_other_world;
 	struct ffa_value ret;
 
 	/* Sender ID MBZ at virtual instance. */
@@ -4399,12 +4425,25 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 	}
 
 	/*
-	 * Copy the fragment to a fresh page from the memory pool. This prevents
-	 * the sender from changing it underneath us, and also lets us keep it
-	 * around in the share state table if needed.
+	 * We can tell from the handle whether the memory transaction is for
+	 * the other world or not. If it is, the hypervisor<->SPMC forwarding
+	 * channel is hard-fixed at exactly one FF-A page (see
+	 * `memory_send_continue_other_world_forward()`), independent of the
+	 * sender's own TX buffer size, so re-impose that limit here or
+	 * `memcpy_s()` inside the forwarding path would panic instead of
+	 * returning an error.
+	 */
+	targets_other_world =
+		!ffa_memory_is_handle_allocated_by_current_world(handle);
+
+	/*
+	 * Copy the fragment to a fresh allocation from the memory pool, sized
+	 * to the incoming fragment. This prevents the sender from changing it
+	 * underneath us, and also lets us keep it around in the share state
+	 * table if needed.
 	 */
 	if (fragment_length > from_buf_size ||
-	    fragment_length > MM_PPOOL_ENTRY_SIZE) {
+	    (targets_other_world && fragment_length > FFA_PAGE_SIZE)) {
 		dlog_verbose(
 			"Fragment length %d larger than buffer size %zu.\n",
 			fragment_length, from_buf_size);
@@ -4417,16 +4456,17 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	fragment_copy = ffa_memory_fragment_alloc();
+	fragment_copy = ffa_memory_fragment_alloc(fragment_length);
 
 	if (fragment_copy == NULL) {
 		dlog_verbose("Failed to allocate fragment copy.\n");
 		return ffa_error(FFA_NO_MEMORY);
 	}
 
-	if (!memcpy_trapped(fragment_copy, MM_PPOOL_ENTRY_SIZE, from_msg,
+	if (!memcpy_trapped(fragment_copy, fragment_length, from_msg,
 			    fragment_length)) {
 		dlog_error("%s: Failed to copy fragment.\n", __func__);
+		ffa_memory_fragment_free(fragment_copy, fragment_length);
 		return ffa_error(FFA_ABORTED);
 	}
 
@@ -4435,15 +4475,13 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 	 * (because it doesn't support caller-specified mappings, so a request
 	 * will never be larger than a single page), so this must be part of a
 	 * memory send (i.e. donate, lend or share) request.
-	 *
-	 * We can tell from the handle whether the memory transaction is for the
-	 * other world or not.
 	 */
-	if (ffa_memory_is_handle_allocated_by_current_world(handle)) {
+	if (!targets_other_world) {
 		struct vm_locked from_locked = vm_lock(from);
 
 		ret = ffa_memory_send_continue(from_locked, fragment_copy,
-					       fragment_length, handle);
+					       fragment_length, fragment_length,
+					       handle);
 		/*
 		 * `ffa_memory_send_continue` takes ownership of the
 		 * fragment_copy, so we don't need to free it here.

@@ -91,7 +91,7 @@ static struct ffa_value memory_send_other_world_forward(
 	 * buffer size rather than FFA_MSG_PAYLOAD_MAX (the build-time
 	 * maximum): the hypervisor<->SPMC channel is always exactly one
 	 * FF-A page regardless of RXTX_MAX_PAGE_COUNT. fragment_length is
-	 * already capped at MM_PPOOL_ENTRY_SIZE (one page) by the caller, so
+	 * already capped at FFA_PAGE_SIZE (one FF-A page) by the caller, so
 	 * this isn't an active overflow today, but matches buf_size for
 	 * consistency and to stay correct if that upstream cap ever changes.
 	 */
@@ -131,7 +131,8 @@ static struct ffa_value memory_send_other_world_forward(
  */
 static struct ffa_value ffa_memory_other_world_send(
 	struct vm_locked from_locked, struct vm_locked to_locked,
-	struct ffa_memory_region *memory_region, int32_t fragment_offset_delta,
+	struct ffa_memory_region *memory_region,
+	size_t memory_region_alloc_size, int32_t fragment_offset_delta,
 	uint32_t memory_share_length, uint32_t fragment_length,
 	uint32_t share_func)
 {
@@ -141,6 +142,25 @@ static struct ffa_value ffa_memory_other_world_send(
 	struct ffa_value ret;
 	struct ffa_value reclaim_ret;
 	(void)reclaim_ret;
+
+	/*
+	 * The hypervisor<->SPMC channel used by
+	 * `memory_send_other_world_forward()` below is hard-fixed at exactly
+	 * one FF-A page, independent of the sender's own TX buffer size (which
+	 * may be larger, e.g. with a multi-page RXTX mailbox). Enforce that
+	 * limit here, since the caller only checked against the sender's buffer
+	 * size; without this, a fragment larger than one page would make
+	 * `memcpy_s()` inside the forwarding path panic instead of returning an
+	 * error.
+	 */
+	if (fragment_length > FFA_PAGE_SIZE) {
+		dlog_verbose(
+			"Fragment length %d exceeds the hypervisor<->SPMC "
+			"forwarding limit of %lu.\n",
+			fragment_length, FFA_PAGE_SIZE);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out_err;
+	}
 
 	/*
 	 * If there is an error validating the `memory_region` then we need to
@@ -175,7 +195,8 @@ static struct ffa_value ffa_memory_other_world_send(
 		handle = ffa_mem_success_handle(ret);
 		share_state = share_state_allocate(
 			share_states, share_func, memory_region,
-			fragment_offset_delta, fragment_length, handle);
+			memory_region_alloc_size, fragment_offset_delta,
+			fragment_length, handle);
 		if (share_state == NULL) {
 			dlog_verbose("%s: failed to allocate share state.\n",
 				     __func__);
@@ -248,7 +269,8 @@ static struct ffa_value ffa_memory_other_world_send(
 		handle = ffa_frag_handle(ret);
 		share_state = share_state_allocate(
 			share_states, share_func, memory_region,
-			fragment_offset_delta, fragment_length, handle);
+			memory_region_alloc_size, fragment_offset_delta,
+			fragment_length, handle);
 		if (share_state == NULL) {
 			dlog_verbose("%s: failed to allocate share state.\n",
 				     __func__);
@@ -280,14 +302,15 @@ out:
 	share_states_unlock(&share_states);
 out_err:
 	if (memory_region != NULL) {
-		CHECK(memory_free(memory_region, PAGE_SIZE));
+		CHECK(memory_free(memory_region, memory_region_alloc_size));
 	}
 	return ret;
 }
 
 struct ffa_value ffa_memory_other_world_mem_send(
 	struct vm *from, uint32_t share_func,
-	struct ffa_memory_region **memory_region, int32_t fragment_offset_delta,
+	struct ffa_memory_region **memory_region,
+	size_t memory_region_alloc_size, int32_t fragment_offset_delta,
 	uint32_t length, uint32_t fragment_length)
 {
 	struct vm *to;
@@ -309,8 +332,9 @@ struct ffa_value ffa_memory_other_world_mem_send(
 	} else {
 		ret = ffa_memory_other_world_send(
 			vm_to_from_lock.vm2, vm_to_from_lock.vm1,
-			*memory_region, fragment_offset_delta, length,
-			fragment_length, share_func);
+			*memory_region, memory_region_alloc_size,
+			fragment_offset_delta, length, fragment_length,
+			share_func);
 		/*
 		 * ffa_other_world_memory_send takes ownership of the
 		 * memory_region, so make sure we don't free it.
@@ -561,6 +585,8 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 	share_state->fragments[share_state->fragment_count] = fragment;
 	share_state->fragment_constituent_counts[share_state->fragment_count] =
 		fragment_length / sizeof(struct ffa_memory_region_constituent);
+	share_state->fragment_alloc_sizes[share_state->fragment_count] =
+		fragment_length;
 	share_state->fragment_count++;
 
 	/* Check whether the memory send operation is now ready to complete. */
@@ -674,7 +700,7 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 	goto out;
 
 out_free_fragment:
-	CHECK(memory_free(fragment, PAGE_SIZE));
+	CHECK(memory_free(fragment, fragment_length));
 
 out:
 	share_states_unlock(&share_states);
