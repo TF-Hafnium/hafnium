@@ -9,6 +9,7 @@
 #include "hf/arch/vm/interrupts.h"
 
 #include "hf/dlog.h"
+#include "hf/ffa.h"
 
 #include "vmapi/hf/call.h"
 
@@ -69,8 +70,8 @@ struct ffa_value sp_notif_unbind_cmd(ffa_id_t test_source,
 	struct ffa_value res;
 	ffa_id_t own_id = hf_vm_get_id();
 
-	dlog_verbose("Unbind notifications %lx, from sender: %x\n", bitmap,
-		     notif_sender);
+	dlog_verbose("Unbind notifications %lx, from sender: %x\n",
+		     ffa_notification_bitmap_low64(bitmap), notif_sender);
 
 	res = ffa_notification_unbind(notif_sender, own_id, bitmap);
 	return sp_check_ffa_return_resp(test_source, own_id, res);

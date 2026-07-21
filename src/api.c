@@ -2425,8 +2425,10 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_id, uint32_t flags,
 	    vm_are_notifications_enabled(receiver_locked.vm)) {
 		ffa_notifications_bitmap_t rx_buffer_full =
 			ffa_is_vm_id(header_sender_id)
-				? FFA_NOTIFICATION_HYP_BUFFER_FULL_MASK
-				: FFA_NOTIFICATION_SPM_BUFFER_FULL_MASK;
+				? ffa_notification_bitmap_single(
+					  FFA_NOTIFICATION_HYP_BUFFER_FULL_ID)
+				: ffa_notification_bitmap_single(
+					  FFA_NOTIFICATION_SPM_BUFFER_FULL_ID);
 
 		vm_notifications_framework_set_pending(receiver_locked,
 						       rx_buffer_full);
@@ -4803,9 +4805,9 @@ struct ffa_value api_ffa_notification_update_bindings(
 		return ret;
 	}
 
-	if (notifications == 0U) {
+	if (ffa_notification_bitmap_is_zero(notifications)) {
 		dlog_verbose("No notifications have been specified %lx.\n",
-			     notifications);
+			     ffa_notification_bitmap_low64(notifications));
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -4851,7 +4853,9 @@ struct ffa_value api_ffa_notification_update_bindings(
 		dlog_verbose(
 			"Sender %x not permitted to set notifications %lx to "
 			"%x.\n",
-			sender_vm_id, notifications, receiver_vm_id);
+			sender_vm_id,
+			ffa_notification_bitmap_low64(notifications),
+			receiver_vm_id);
 		ret = ffa_error(FFA_DENIED);
 		goto out;
 	}
@@ -4864,7 +4868,7 @@ struct ffa_value api_ffa_notification_update_bindings(
 					 ffa_is_vm_id(sender_vm_id),
 					 notifications)) {
 		dlog_verbose("Notifications within '%lx' pending.\n",
-			     notifications);
+			     ffa_notification_bitmap_low64(notifications));
 		ret = ffa_error(FFA_DENIED);
 		goto out;
 	}
@@ -4923,7 +4927,7 @@ struct ffa_value api_ffa_notification_set(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	if (notifications == 0U) {
+	if (ffa_notification_bitmap_is_zero(notifications)) {
 		dlog_verbose("No notifications have been specified.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -4983,7 +4987,8 @@ struct ffa_value api_ffa_notification_set(
 	vm_notifications_partition_set_pending(
 		receiver_locked, ffa_is_vm_id(sender_vm_id), notifications);
 
-	dlog_verbose("Set the notifications: %lx.\n", notifications);
+	dlog_verbose("Set the notifications: %lx.\n",
+		     ffa_notification_bitmap_low64(notifications));
 
 	if (!delay_sri) {
 		dlog_verbose("SRI was NOT delayed. vcpu: %u!\n",
@@ -5007,12 +5012,12 @@ static struct ffa_value api_ffa_notification_get_success_return(
 	return (struct ffa_value){
 		.func = FFA_SUCCESS_32,
 		.arg1 = 0U,
-		.arg2 = (uint32_t)from_sp,
-		.arg3 = (uint32_t)(from_sp >> 32),
-		.arg4 = (uint32_t)from_vm,
-		.arg5 = (uint32_t)(from_vm >> 32),
-		.arg6 = (uint32_t)from_framework,
-		.arg7 = (uint32_t)(from_framework >> 32),
+		.arg2 = ffa_notification_bitmap_low32(from_sp),
+		.arg3 = ffa_notification_bitmap_high32(from_sp),
+		.arg4 = ffa_notification_bitmap_low32(from_vm),
+		.arg5 = ffa_notification_bitmap_high32(from_vm),
+		.arg6 = ffa_notification_bitmap_low32(from_framework),
+		.arg7 = ffa_notification_bitmap_high32(from_framework),
 	};
 }
 
@@ -5020,11 +5025,14 @@ struct ffa_value api_ffa_notification_get(ffa_id_t receiver_vm_id,
 					  ffa_vcpu_index_t vcpu_id,
 					  uint32_t flags, struct vcpu *current)
 {
-	ffa_notifications_bitmap_t framework_notifications = 0;
-	ffa_notifications_bitmap_t sp_notifications = 0;
-	ffa_notifications_bitmap_t vm_notifications = 0;
 	struct vm_locked receiver_locked;
 	struct ffa_value ret;
+	ffa_notifications_bitmap_t framework_notifications;
+	ffa_notifications_bitmap_t sp_notifications;
+	ffa_notifications_bitmap_t vm_notifications;
+	ffa_notification_bitmap_init(&framework_notifications);
+	ffa_notification_bitmap_init(&sp_notifications);
+	ffa_notification_bitmap_init(&vm_notifications);
 	const uint32_t flags_mbz = ~(FFA_NOTIFICATION_FLAG_BITMAP_HYP |
 				     FFA_NOTIFICATION_FLAG_BITMAP_SPM |
 				     FFA_NOTIFICATION_FLAG_BITMAP_SP |

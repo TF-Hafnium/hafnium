@@ -202,8 +202,9 @@ static void get_notifications(ffa_id_t own_id, ffa_id_t receiver_id,
 	res = sp_notif_get_cmd_send(own_id, receiver_id, 0,
 				    FFA_NOTIFICATION_FLAG_BITMAP_VM);
 	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
-	EXPECT_EQ(sp_notif_get_from_sp(res), 0);
-	EXPECT_EQ(sp_notif_get_from_vm(res), bitmap);
+	EXPECT_TRUE(ffa_notification_bitmap_is_zero(sp_notif_get_from_sp(res)));
+	EXPECT_EQ(ffa_notification_bitmap_low64(sp_notif_get_from_vm(res)),
+		  ffa_notification_bitmap_low64(bitmap));
 }
 
 static void unbind_notifications(ffa_id_t own_id, ffa_id_t receiver_id,
@@ -330,7 +331,7 @@ void base_live_activate_sp(ffa_id_t receiver_id, uint32_t component_id)
 	increment_and_validate_shared_buffer(own_id, receiver_id, 1);
 
 	flags = FFA_NOTIFICATIONS_FLAG_DELAY_SRI;
-	bitmap = FFA_NOTIFICATION_MASK(35);
+	bitmap = ffa_notification_bitmap_single(35);
 	setup_notifications(own_id, receiver_id, flags, bitmap);
 
 	/* First live activation */

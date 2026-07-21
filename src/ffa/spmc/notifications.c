@@ -301,7 +301,8 @@ struct ffa_value ffa_notifications_bitmap_destroy(ffa_id_t vm_id)
 	}
 
 	/* Check if there is any notification pending. */
-	if (vm_are_notifications_pending(to_destroy_locked, false, ~0x0U)) {
+	if (vm_are_notifications_pending(to_destroy_locked, false,
+					 ffa_notification_bitmap_all_ones())) {
 		dlog_verbose("VM has notifications pending.\n");
 		ret = ffa_error(FFA_DENIED);
 		goto out;

@@ -631,6 +631,12 @@ static inline struct ffa_value ffa_msg_send_direct_resp2(ffa_id_t sender_vm_id,
 	return ffa_call_ext(args);
 }
 
+/**
+ * Build arguments for the legacy notification interfaces.
+ *
+ * The internal bitmap supports 384 notification IDs, but legacy interfaces
+ * transport only IDs 0-63 in arg3 and arg4.
+ */
 static inline struct ffa_value ffa_notification_args(
 	uint32_t func, ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id,
 	uint32_t flags, ffa_notifications_bitmap_t bitmap)
@@ -639,8 +645,8 @@ static inline struct ffa_value ffa_notification_args(
 		.func = func,
 		.arg1 = ((uint64_t)sender_vm_id << 16) | (receiver_vm_id),
 		.arg2 = flags,
-		.arg3 = (uint32_t)(bitmap),
-		.arg4 = (uint32_t)(bitmap >> 32),
+		.arg3 = ffa_notification_bitmap_low32(bitmap),
+		.arg4 = ffa_notification_bitmap_high32(bitmap),
 	};
 }
 

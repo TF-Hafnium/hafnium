@@ -49,8 +49,9 @@ static void notif_signal_vm_to_sp(ffa_id_t sender, ffa_id_t receiver,
 	res = sp_notif_get_cmd_send(sender, receiver, vcpu_id,
 				    FFA_NOTIFICATION_FLAG_BITMAP_VM);
 	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
-	EXPECT_EQ(sp_notif_get_from_sp(res), 0);
-	EXPECT_EQ(sp_notif_get_from_vm(res), bitmap);
+	EXPECT_TRUE(ffa_notification_bitmap_is_zero(sp_notif_get_from_sp(res)));
+	EXPECT_EQ(ffa_notification_bitmap_low64(sp_notif_get_from_vm(res)),
+		  ffa_notification_bitmap_low64(bitmap));
 
 	/* Request to unbind notifications */
 	res = sp_notif_unbind_cmd_send(sender, receiver, sender, bitmap);
@@ -83,7 +84,9 @@ static void notif_signal_sp_to_vm(ffa_id_t sender, ffa_id_t receiver,
 				   FFA_NOTIFICATION_FLAG_BITMAP_SP);
 	EXPECT_EQ(res.func, FFA_SUCCESS_32);
 
-	EXPECT_EQ(ffa_notification_get_from_sp(res), bitmap);
+	EXPECT_EQ(ffa_notification_bitmap_low64(
+			  ffa_notification_get_from_sp(res)),
+		  ffa_notification_bitmap_low64(bitmap));
 	EXPECT_EQ(res.arg4, 0);
 	EXPECT_EQ(res.arg5, 0);
 	EXPECT_EQ(res.arg6, 0);
@@ -99,7 +102,7 @@ static void notif_signal_sp_to_vm(ffa_id_t sender, ffa_id_t receiver,
 TEST(ffa_notifications, signaling_from_sp_to_vm)
 {
 	notif_signal_sp_to_vm(SP_ID(1), hf_vm_get_id(),
-			      FFA_NOTIFICATION_MASK(20),
+			      ffa_notification_bitmap_single(20),
 			      FFA_NOTIFICATIONS_FLAG_DELAY_SRI);
 }
 
@@ -113,7 +116,7 @@ TEST(ffa_notifications, signaling_from_vm_to_sp)
 	 * Target SP should be FF-A v1.1 or newer.
 	 */
 	notif_signal_vm_to_sp(hf_vm_get_id(), SP_ID(2),
-			      FFA_NOTIFICATION_MASK(35),
+			      ffa_notification_bitmap_single(35),
 			      FFA_NOTIFICATIONS_FLAG_DELAY_SRI);
 }
 
@@ -125,12 +128,12 @@ TEST(ffa_notifications, fail_if_mbz_set_in_notification_get)
 
 	/* Arbitrarily bind notification. */
 	res = ffa_notification_bind(sender, own_id, 0,
-				    FFA_NOTIFICATION_MASK(1));
+				    ffa_notification_bitmap_single(1));
 	EXPECT_EQ(res.func, FFA_SUCCESS_32);
 
 	/* Requesting sender to set notification. */
 	res = sp_notif_set_cmd_send(own_id, sender, own_id, 0,
-				    FFA_NOTIFICATION_MASK(1));
+				    ffa_notification_bitmap_single(1));
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
 
@@ -147,14 +150,14 @@ TEST(ffa_notifications, fail_if_mbz_set_in_notification_set)
 
 	/* Arbitrarily bind notification. */
 	res = ffa_notification_bind(sender, own_id, 0,
-				    FFA_NOTIFICATION_MASK(1));
+				    ffa_notification_bitmap_single(1));
 	EXPECT_EQ(res.func, FFA_SUCCESS_32);
 
 	/* Requesting sender to set notification. */
 	res = sp_notif_set_cmd_send(own_id, sender, own_id,
 				    ~(FFA_NOTIFICATION_FLAG_PER_VCPU |
 				      FFA_NOTIFICATIONS_FLAG_DELAY_SRI),
-				    FFA_NOTIFICATION_MASK(1));
+				    ffa_notification_bitmap_single(1));
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(res), SP_ERROR);
 	EXPECT_EQ(sp_resp_value(res), FFA_INVALID_PARAMETERS);
@@ -172,13 +175,13 @@ TEST(ffa_notifications, fail_if_global_notif_vcpu_not_zero)
 
 	/* Arbitrarily bind notification. */
 	res = ffa_notification_bind(sender, own_id, 0,
-				    FFA_NOTIFICATION_MASK(1));
+				    ffa_notification_bitmap_single(1));
 	EXPECT_EQ(res.func, FFA_SUCCESS_32);
 
 	/* Requesting sender to set notification. */
 	res = sp_notif_set_cmd_send(own_id, sender, own_id,
 				    FFA_NOTIFICATIONS_FLAGS_VCPU_ID(5),
-				    FFA_NOTIFICATION_MASK(1));
+				    ffa_notification_bitmap_single(1));
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(res), SP_ERROR);
 	EXPECT_EQ(sp_resp_value(res), FFA_INVALID_PARAMETERS);
@@ -192,13 +195,13 @@ TEST(ffa_notifications, fail_if_global_notif_set_as_per_vcpu)
 
 	/* Arbitrarily bind global notification. */
 	res = ffa_notification_bind(sender, own_id, 0,
-				    FFA_NOTIFICATION_MASK(1));
+				    ffa_notification_bitmap_single(1));
 	EXPECT_EQ(res.func, FFA_SUCCESS_32);
 
 	/* Requesting sender to set notification: as per-vCPU. */
 	res = sp_notif_set_cmd_send(own_id, sender, own_id,
 				    FFA_NOTIFICATION_FLAG_PER_VCPU,
-				    FFA_NOTIFICATION_MASK(1));
+				    ffa_notification_bitmap_single(1));
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(res), SP_ERROR);
 	EXPECT_EQ(sp_resp_value(res), FFA_INVALID_PARAMETERS);
@@ -212,6 +215,6 @@ TEST(ffa_notifications, fail_if_mbz_set_in_notifications_bind)
 
 	res = ffa_notification_bind(sender, own_id,
 				    ~FFA_NOTIFICATION_FLAG_PER_VCPU,
-				    FFA_NOTIFICATION_MASK(1));
+				    ffa_notification_bitmap_single(1));
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 }

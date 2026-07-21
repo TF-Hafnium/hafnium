@@ -385,10 +385,10 @@ static inline struct ffa_value sp_notif_set_cmd_send(
 	ffa_id_t sender, ffa_id_t receiver, ffa_id_t notif_receiver,
 	uint32_t flags, ffa_notifications_bitmap_t bitmap)
 {
-	return ffa_msg_send_direct_req(sender, receiver, SP_NOTIF_SET_CMD,
-				       notif_receiver, flags,
-				       (uint32_t)bitmap,	  /* lo */
-				       (uint32_t)(bitmap >> 32)); /* hi */
+	return ffa_msg_send_direct_req(
+		sender, receiver, SP_NOTIF_SET_CMD, notif_receiver, flags,
+		ffa_notification_bitmap_low32(bitmap),	 /* low */
+		ffa_notification_bitmap_high32(bitmap)); /* high */
 }
 
 static inline ffa_id_t sp_notif_receiver(struct ffa_value cmd)
@@ -434,11 +434,12 @@ static inline struct ffa_value sp_notif_get_success(
 	ffa_id_t sender, ffa_id_t receiver, ffa_notifications_bitmap_t from_sp,
 	ffa_notifications_bitmap_t from_vm)
 {
-	return ffa_msg_send_direct_resp(sender, receiver, SP_SUCCESS,
-					(uint32_t)from_sp,	    /*lo*/
-					(uint32_t)(from_sp >> 32),  /*hi*/
-					(uint32_t)from_vm,	    /*lo*/
-					(uint32_t)(from_vm >> 32)); /*hi*/
+	return ffa_msg_send_direct_resp(
+		sender, receiver, SP_SUCCESS,
+		ffa_notification_bitmap_low32(from_sp),	  /* low */
+		ffa_notification_bitmap_high32(from_sp),  /* high */
+		ffa_notification_bitmap_low32(from_vm),	  /* low */
+		ffa_notification_bitmap_high32(from_vm)); /* high */
 }
 
 static inline ffa_notifications_bitmap_t sp_notif_get_from_sp(
@@ -460,10 +461,10 @@ static inline struct ffa_value sp_notif_bind_cmd_send(
 	ffa_id_t sender, ffa_id_t receiver, ffa_id_t notif_sender,
 	uint32_t flags, ffa_notifications_bitmap_t bitmap)
 {
-	return ffa_msg_send_direct_req(sender, receiver, SP_NOTIF_BIND_CMD,
-				       notif_sender, flags,
-				       (uint32_t)bitmap,	  /* lo */
-				       (uint32_t)(bitmap >> 32)); /* hi */
+	return ffa_msg_send_direct_req(
+		sender, receiver, SP_NOTIF_BIND_CMD, notif_sender, flags,
+		ffa_notification_bitmap_low32(bitmap),	 /* low */
+		ffa_notification_bitmap_high32(bitmap)); /* high */
 }
 
 static inline ffa_id_t sp_notif_bind_sender(struct ffa_value cmd)
@@ -482,10 +483,10 @@ static inline struct ffa_value sp_notif_unbind_cmd_send(
 	ffa_id_t sender, ffa_id_t receiver, ffa_id_t notif_sender,
 	ffa_notifications_bitmap_t bitmap)
 {
-	return ffa_msg_send_direct_req(sender, receiver, SP_NOTIF_UNBIND_CMD,
-				       notif_sender, 0,
-				       (uint32_t)bitmap,	  /* lo */
-				       (uint32_t)(bitmap >> 32)); /* hi */
+	return ffa_msg_send_direct_req(
+		sender, receiver, SP_NOTIF_UNBIND_CMD, notif_sender, 0,
+		ffa_notification_bitmap_low32(bitmap),	 /* low */
+		ffa_notification_bitmap_high32(bitmap)); /* high */
 }
 
 struct ffa_value sp_notif_unbind_cmd(ffa_id_t test_source,

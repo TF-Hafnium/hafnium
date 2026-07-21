@@ -93,15 +93,17 @@ void mailbox_receive_retry(void *payload, size_t payload_size,
 	const struct ffa_partition_msg *message;
 	ffa_id_t sender;
 	struct ffa_value ret;
-	ffa_notifications_bitmap_t fwk_notif = 0U;
+	ffa_notifications_bitmap_t fwk_notif;
+
 	const ffa_id_t own_id = hf_vm_get_id();
+	ffa_notification_bitmap_init(&fwk_notif);
 
 	ASSERT_LE(payload_size, FFA_MSG_PAYLOAD_MAX);
 	ASSERT_TRUE(header != NULL);
 	ASSERT_TRUE(recv_buf != NULL);
 
 	/* Check notification and wait if not messages. */
-	while (fwk_notif == 0U) {
+	while (ffa_notification_bitmap_is_zero(fwk_notif)) {
 		ret = ffa_notification_get(
 			own_id, 0,
 			FFA_NOTIFICATION_FLAG_BITMAP_SPM |
@@ -110,7 +112,7 @@ void mailbox_receive_retry(void *payload, size_t payload_size,
 			fwk_notif = ffa_notification_get_from_framework(ret);
 		}
 
-		if (fwk_notif == 0U) {
+		if (ffa_notification_bitmap_is_zero(fwk_notif)) {
 			ffa_msg_wait();
 		}
 	}
@@ -467,7 +469,7 @@ static struct ffa_partition_msg *get_mailbox_message(void *recv)
 	ffa_notifications_bitmap_t fwk_notif =
 		ffa_notification_get_from_framework(ret);
 
-	if (fwk_notif == 0U) {
+	if (ffa_notification_bitmap_is_zero(fwk_notif)) {
 		HFTEST_LOG("There is no framework notifications.");
 		return NULL;
 	}
@@ -838,7 +840,7 @@ struct ffa_partition_rxtx_header receive_indirect_message(void *payload,
 
 	fwk_notif = ffa_notification_get_from_framework(ret);
 
-	if (fwk_notif == 0U) {
+	if (ffa_notification_bitmap_is_zero(fwk_notif)) {
 		FAIL("Expected Rx buffer full notification.");
 	}
 

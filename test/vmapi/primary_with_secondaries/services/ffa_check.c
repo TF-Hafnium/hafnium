@@ -251,7 +251,7 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_notifications_bound)
 {
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	struct ffa_partition_info *service2_info = service2(recv_buf);
-	ffa_notifications_bitmap_t bitmap = FFA_NOTIFICATION_MASK(1);
+	ffa_notifications_bitmap_t bitmap = ffa_notification_bitmap_single(1);
 
 	EXPECT_EQ(ffa_notification_bind(service2_info->vm_id, hf_vm_get_id(), 0,
 					bitmap)

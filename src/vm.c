@@ -665,8 +665,11 @@ bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
  */
 bool vm_are_global_notifications_pending(struct vm_locked vm_locked)
 {
-	return vm_get_notifications(vm_locked, true)->global.pending != 0ULL ||
-	       vm_get_notifications(vm_locked, false)->global.pending != 0ULL ||
+	return !ffa_notification_bitmap_is_zero(
+		       vm_get_notifications(vm_locked, true)->global.pending) ||
+	       !ffa_notification_bitmap_is_zero(
+		       vm_get_notifications(vm_locked, false)
+			       ->global.pending) ||
 	       vm_are_fwk_notifications_pending(vm_locked);
 }
 
@@ -848,10 +851,10 @@ static void vm_notifications_state_set(struct notifications_state *state,
 	 * leaving the pending counter in a wrongful state.
 	 */
 	ffa_notifications_bitmap_t to_set =
-		(state->pending & notifications) ^ notifications;
+		ffa_notification_bitmap_exclude(notifications, state->pending);
 
 	/* Change the state of the pending notifications. */
-	state->pending |= to_set;
+	state->pending = ffa_notification_bitmap_or(state->pending, to_set);
 	vm_notifications_pending_count_add(to_set);
 }
 
@@ -902,16 +905,16 @@ static ffa_notifications_bitmap_t vm_notifications_state_get_pending(
 	 * If notifications receiver is getting have been retrieved by the
 	 * receiver scheduler, decrement those from respective count.
 	 */
-	pending_and_info_get_retrieved =
-		state->pending & state->info_get_retrieved;
+	pending_and_info_get_retrieved = ffa_notification_bitmap_and(
+		state->pending, state->info_get_retrieved);
 
-	if (pending_and_info_get_retrieved != 0) {
+	if (!ffa_notification_bitmap_is_zero(pending_and_info_get_retrieved)) {
 		vm_notifications_info_get_retrieved_count_sub(
 			pending_and_info_get_retrieved);
 	}
 
-	state->pending = 0U;
-	state->info_get_retrieved = 0U;
+	ffa_notification_bitmap_init(&state->pending);
+	ffa_notification_bitmap_init(&state->info_get_retrieved);
 
 	return to_ret;
 }
@@ -1026,10 +1029,10 @@ static bool vm_notifications_state_info_get(
 {
 	ffa_notifications_bitmap_t pending_not_retrieved;
 
-	pending_not_retrieved = state->pending & ~state->info_get_retrieved;
-
+	pending_not_retrieved = ffa_notification_bitmap_exclude(
+		state->pending, state->info_get_retrieved);
 	/* No notifications pending that haven't been retrieved. */
-	if (pending_not_retrieved == 0U) {
+	if (ffa_notification_bitmap_is_zero(pending_not_retrieved)) {
 		return false;
 	}
 
@@ -1040,7 +1043,8 @@ static bool vm_notifications_state_info_get(
 		return false;
 	}
 
-	state->info_get_retrieved |= pending_not_retrieved;
+	state->info_get_retrieved = ffa_notification_bitmap_or(
+		state->info_get_retrieved, pending_not_retrieved);
 
 	vm_notifications_info_get_retrieved_count_add(pending_not_retrieved);
 

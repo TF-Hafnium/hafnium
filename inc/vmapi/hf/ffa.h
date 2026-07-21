@@ -1413,69 +1413,209 @@ struct ffa_boot_info_header {
 };
 
 /**
- * FF-A v1.1 specification restricts the number of notifications to a maximum
- * of 64. Following all possible bitmaps.
- */
-#define FFA_NOTIFICATION_MASK(ID) (UINT64_C(1) << (ID))
-
-typedef uint64_t ffa_notifications_bitmap_t;
-
-#define MAX_FFA_NOTIFICATIONS 64U
-
-/**
  * Flag for notification bind and set, to specify call is about per-vCPU
  * notifications.
  */
 #define FFA_NOTIFICATION_FLAG_PER_VCPU (UINT32_C(1) << 0)
 
-#define FFA_NOTIFICATION_SPM_BUFFER_FULL_MASK FFA_NOTIFICATION_MASK(0)
-#define FFA_NOTIFICATION_HYP_BUFFER_FULL_MASK FFA_NOTIFICATION_MASK(32)
+/**
+ * Maximum number of notification IDs supported by the FF-A v1.3
+ * extended notification bitmap representation.
+ */
+#define MAX_FFA_NOTIFICATIONS 384U
+
+/* Bitmap layout: 6 x 64-bit words to cover up to 384 notification IDs. */
+#define FFA_NOTIFICATION_BITS_PER_WORD 64U
+
+/* Number of 64-bit words required to represent MAX_FFA_NOTIFICATIONS. */
+#define FFA_NOTIFICATION_WORDS                                           \
+	((MAX_FFA_NOTIFICATIONS + FFA_NOTIFICATION_BITS_PER_WORD - 1U) / \
+	 FFA_NOTIFICATION_BITS_PER_WORD)
+
+static_assert(FFA_NOTIFICATION_WORDS == 6U,
+	      "Extended notification bitmap must contain six 64-bit words");
+
+#define FFA_NOTIFICATION_WORD_INDEX(id) ((id) / FFA_NOTIFICATION_BITS_PER_WORD)
+#define FFA_NOTIFICATION_WORD_OFFSET(id) ((id) % FFA_NOTIFICATION_BITS_PER_WORD)
+#define FFA_NOTIFICATION_MASK_IN_WORD(id) \
+	(UINT64_C(1) << FFA_NOTIFICATION_WORD_OFFSET(id))
+
+#define FFA_NOTIFICATION_SPM_BUFFER_FULL_ID 0U
+#define FFA_NOTIFICATION_HYP_BUFFER_FULL_ID 32U
+
+typedef struct ffa_notifications_bitmap {
+	uint64_t words[FFA_NOTIFICATION_WORDS];
+} ffa_notifications_bitmap_t;
 
 /* Notification bitmap helper functions. */
+
+/* Initialize all notification bitmap words to zero. */
+static inline void ffa_notification_bitmap_init(
+	ffa_notifications_bitmap_t *bitmap)
+{
+	for (uint32_t i = 0U; i < FFA_NOTIFICATION_WORDS; ++i) {
+		bitmap->words[i] = 0U;
+	}
+}
+
+/* Return true if no notification IDs are set in the bitmap. */
 static inline bool ffa_notification_bitmap_is_zero(
 	ffa_notifications_bitmap_t bitmap)
 {
-	return (bitmap == 0U);
+	for (uint32_t i = 0U; i < FFA_NOTIFICATION_WORDS; ++i) {
+		if (bitmap.words[i] != 0U) {
+			return false;
+		}
+	}
+	return true;
 }
 
+static inline bool ffa_notification_bitmap_equal(
+	ffa_notifications_bitmap_t bitmap1, ffa_notifications_bitmap_t bitmap2)
+{
+	for (uint32_t i = 0U; i < FFA_NOTIFICATION_WORDS; ++i) {
+		if (bitmap1.words[i] != bitmap2.words[i]) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/* Return true if the two bitmaps contain at least one common notification ID */
+static inline bool ffa_notification_bitmap_intersects(
+	ffa_notifications_bitmap_t bitmap1, ffa_notifications_bitmap_t bitmap2)
+{
+	for (uint32_t i = 0U; i < FFA_NOTIFICATION_WORDS; ++i) {
+		if ((bitmap1.words[i] & bitmap2.words[i]) != 0U) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/* Return true if the specified notification ID is set in the bitmap. */
 static inline bool ffa_notification_bitmap_is_set(
 	ffa_notifications_bitmap_t bitmap, uint32_t id)
 {
-	return ((bitmap & FFA_NOTIFICATION_MASK(id)) != 0U);
+	assert(id < MAX_FFA_NOTIFICATIONS);
+	return (bitmap.words[FFA_NOTIFICATION_WORD_INDEX(id)] &
+		FFA_NOTIFICATION_MASK_IN_WORD(id)) != 0U;
 }
 
 static inline void ffa_notification_bitmap_set(
 	ffa_notifications_bitmap_t *bitmap, uint32_t id)
 {
-	*bitmap |= FFA_NOTIFICATION_MASK(id);
+	assert(id < MAX_FFA_NOTIFICATIONS);
+	bitmap->words[FFA_NOTIFICATION_WORD_INDEX(id)] |=
+		FFA_NOTIFICATION_MASK_IN_WORD(id);
 }
 
 static inline void ffa_notification_bitmap_clear(
 	ffa_notifications_bitmap_t *bitmap, uint32_t id)
 {
-	*bitmap &= ~FFA_NOTIFICATION_MASK(id);
+	assert(id < MAX_FFA_NOTIFICATIONS);
+	bitmap->words[FFA_NOTIFICATION_WORD_INDEX(id)] &=
+		~FFA_NOTIFICATION_MASK_IN_WORD(id);
 }
 
 static inline ffa_notifications_bitmap_t ffa_notification_bitmap_or(
 	ffa_notifications_bitmap_t bitmap1, ffa_notifications_bitmap_t bitmap2)
 {
-	return (bitmap1 | bitmap2);
+	ffa_notifications_bitmap_t out = bitmap1;
+
+	for (uint32_t i = 0U; i < FFA_NOTIFICATION_WORDS; ++i) {
+		out.words[i] |= bitmap2.words[i];
+	}
+	return out;
 }
 
+/* Return a new bitmap that is the bitwise AND of the two bitmaps. */
 static inline ffa_notifications_bitmap_t ffa_notification_bitmap_and(
 	ffa_notifications_bitmap_t bitmap1, ffa_notifications_bitmap_t bitmap2)
 {
-	return (bitmap1 & bitmap2);
+	ffa_notifications_bitmap_t out = bitmap1;
+
+	for (uint32_t i = 0U; i < FFA_NOTIFICATION_WORDS; ++i) {
+		out.words[i] &= bitmap2.words[i];
+	}
+	return out;
 }
 
 /**
- * Returns true if the two notification bitmaps share at least one common
- * notification ID.
+ * Return a copy of bitmap with all bits present in excluded cleared.
+ *
+ * This is equivalent to bitmap & ~excluded.
  */
-static inline bool ffa_notification_bitmap_intersects(
-	ffa_notifications_bitmap_t bitmap1, ffa_notifications_bitmap_t bitmap2)
+static inline ffa_notifications_bitmap_t ffa_notification_bitmap_exclude(
+	ffa_notifications_bitmap_t bitmap, ffa_notifications_bitmap_t excluded)
 {
-	return (bitmap1 & bitmap2) != 0U;
+	ffa_notifications_bitmap_t out = bitmap;
+
+	for (uint32_t i = 0U; i < FFA_NOTIFICATION_WORDS; ++i) {
+		out.words[i] &= ~excluded.words[i];
+	}
+	return out;
+}
+
+/**
+ * Construct a bitmap containing only the specified notification ID.
+ *
+ * The caller must ensure that id is less than MAX_FFA_NOTIFICATIONS.
+ */
+static inline ffa_notifications_bitmap_t ffa_notification_bitmap_single(
+	uint32_t id)
+{
+	ffa_notifications_bitmap_t out;
+
+	ffa_notification_bitmap_init(&out);
+	ffa_notification_bitmap_set(&out, id);
+	return out;
+}
+
+static inline ffa_notifications_bitmap_t ffa_notification_bitmap_all_ones(void)
+{
+	ffa_notifications_bitmap_t bitmap;
+
+	for (uint32_t i = 0U; i < FFA_NOTIFICATION_WORDS; ++i) {
+		bitmap.words[i] = ~UINT64_C(0);
+	}
+	return bitmap;
+}
+
+/**
+ * Construct an extended notification bitmap from the 64-bit bitmap used by
+ * the legacy notification interfaces.
+ */
+static inline ffa_notifications_bitmap_t
+ffa_notification_bitmap_from_legacy_u64(uint64_t value)
+{
+	ffa_notifications_bitmap_t bitmap;
+
+	ffa_notification_bitmap_init(&bitmap);
+	bitmap.words[0] = value;
+	return bitmap;
+}
+
+/**
+ * Helpers for accessing the lower 64-bit portion of an extended
+ * notification bitmap used by the legacy notification interfaces.
+ */
+static inline uint64_t ffa_notification_bitmap_low64(
+	ffa_notifications_bitmap_t bitmap)
+{
+	return bitmap.words[0];
+}
+
+static inline uint32_t ffa_notification_bitmap_low32(
+	ffa_notifications_bitmap_t bitmap)
+{
+	return (uint32_t)(bitmap.words[0] & UINT64_C(0xffffffff));
+}
+
+static inline uint32_t ffa_notification_bitmap_high32(
+	ffa_notifications_bitmap_t bitmap)
+{
+	return (uint32_t)((bitmap.words[0] >> 32U) & UINT64_C(0xffffffff));
 }
 
 /**
@@ -1484,25 +1624,29 @@ static inline bool ffa_notification_bitmap_intersects(
 static inline bool is_ffa_hyp_buffer_full_notification(
 	ffa_notifications_bitmap_t framework)
 {
-	return (framework & FFA_NOTIFICATION_HYP_BUFFER_FULL_MASK) != 0;
+	return ffa_notification_bitmap_is_set(
+		framework, FFA_NOTIFICATION_HYP_BUFFER_FULL_ID);
 }
 
 static inline bool is_ffa_spm_buffer_full_notification(
 	ffa_notifications_bitmap_t framework)
 {
-	return (framework & FFA_NOTIFICATION_SPM_BUFFER_FULL_MASK) != 0;
+	return ffa_notification_bitmap_is_set(
+		framework, FFA_NOTIFICATION_SPM_BUFFER_FULL_ID);
 }
 
 /**
- * Helper function to assemble a 64-bit sized bitmap, from the 32-bit sized lo
- * and hi.
+ * Helper function to assemble a 64-bit sized bitmap, from the 32-bit sized low
+ * and high.
  * Helpful as FF-A specification defines that the notifications interfaces
  * arguments are 32-bit registers.
  */
-static inline ffa_notifications_bitmap_t ffa_notifications_bitmap(uint32_t lo,
-								  uint32_t hi)
+static inline ffa_notifications_bitmap_t ffa_notifications_bitmap(uint32_t low,
+								  uint32_t high)
 {
-	return (ffa_notifications_bitmap_t)hi << 32U | lo;
+	uint64_t value = ((uint64_t)high << 32U) | low;
+
+	return ffa_notification_bitmap_from_legacy_u64(value);
 }
 
 static inline ffa_notifications_bitmap_t ffa_notification_get_from_sp(

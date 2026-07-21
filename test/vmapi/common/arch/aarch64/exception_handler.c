@@ -96,7 +96,7 @@ int exception_handler_receive_exception_count(const void *recv_buf)
 
 	fwk_notif = ffa_notification_get_from_framework(ret);
 
-	if (fwk_notif == 0U ||
+	if (ffa_notification_bitmap_is_zero(fwk_notif) ||
 	    exception_msg->header.size != sizeof(exception_count)) {
 		return 0;
 	}

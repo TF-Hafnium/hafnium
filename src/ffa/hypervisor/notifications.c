@@ -56,8 +56,8 @@ bool ffa_notifications_update_bindings_forward(
 					: FFA_NOTIFICATION_UNBIND_32,
 			.arg1 = ((uint64_t)sender_id << 16) | (receiver_id),
 			.arg2 = is_bind ? flags : 0U,
-			.arg3 = (uint32_t)(bitmap),
-			.arg4 = (uint32_t)(bitmap >> 32),
+			.arg3 = ffa_notification_bitmap_low32(bitmap),
+			.arg4 = ffa_notification_bitmap_high32(bitmap),
 		});
 		return true;
 	}
@@ -89,8 +89,8 @@ bool ffa_notifications_set_forward(ffa_id_t sender_vm_id,
 		.func = FFA_NOTIFICATION_SET_32,
 		.arg1 = ((uint64_t)sender_vm_id << 16) | receiver_vm_id,
 		.arg2 = flags & ~FFA_NOTIFICATIONS_FLAG_DELAY_SRI,
-		.arg3 = (uint32_t)(bitmap),
-		.arg4 = (uint32_t)(bitmap >> 32),
+		.arg3 = ffa_notification_bitmap_low32(bitmap),
+		.arg4 = ffa_notification_bitmap_high32(bitmap),
 	});
 
 	if (ret->func == FFA_ERROR_32) {
@@ -254,12 +254,13 @@ struct ffa_value ffa_notifications_get_framework_notifications(
 {
 	struct ffa_value ret = {.func = FFA_SUCCESS_32};
 	ffa_id_t receiver_id = receiver_locked.vm->id;
-	ffa_notifications_bitmap_t spm_notifications = 0;
+	ffa_notifications_bitmap_t spm_notifications;
 
 	(void)flags;
 
 	assert(from_fwk != NULL);
 
+	ffa_notification_bitmap_init(&spm_notifications);
 	/* Get SPMC notifications. */
 	if (ffa_init_is_tee_enabled()) {
 		ret = arch_other_world_call((struct ffa_value){
@@ -276,8 +277,9 @@ struct ffa_value ffa_notifications_get_framework_notifications(
 	}
 
 	/* Merge notifications from SPMC and Hypervisor. */
-	*from_fwk = spm_notifications |
-		    vm_notifications_framework_get_pending(receiver_locked);
+	*from_fwk = ffa_notification_bitmap_or(
+		spm_notifications,
+		vm_notifications_framework_get_pending(receiver_locked));
 
 	return ret;
 }

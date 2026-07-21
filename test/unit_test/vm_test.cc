@@ -12,6 +12,7 @@ extern "C" {
 #include "hf/arch/mm.h"
 
 #include "hf/check.h"
+#include "hf/ffa.h"
 #include "hf/mm.h"
 #include "hf/plat/memory_alloc.h"
 #include "hf/timer_mgmt.h"
@@ -224,7 +225,10 @@ TEST_F(vm, vm_notifications_bind_diff_senders)
 	struct vm_locked current_vm_locked;
 	std::vector<struct_vm *> dummy_senders;
 	ffa_notifications_bitmap_t bitmaps[] = {
-		0x00000000FFFFFFFFU, 0xFFFFFFFF00000000U, 0x0000FFFFFFFF0000U};
+		ffa_notification_bitmap_from_legacy_u64(0x00000000FFFFFFFFULL),
+		ffa_notification_bitmap_from_legacy_u64(0xFFFFFFFF00000000ULL),
+		ffa_notification_bitmap_from_legacy_u64(0x0000FFFFFFFF0000ULL),
+	};
 	bool is_from_vm = true;
 
 	/* For the subsequent tests three VMs are used. */
@@ -286,7 +290,8 @@ TEST_F(vm, vm_notification_bind_global_only)
 	struct_vm *current_vm;
 	struct vm_locked current_vm_locked;
 	struct_vm *dummy_sender;
-	ffa_notifications_bitmap_t global = 0x00000000FFFFFFFFU;
+	ffa_notifications_bitmap_t global =
+		ffa_notification_bitmap_from_legacy_u64(0x00000000FFFFFFFFU);
 	bool is_from_vm = true;
 
 	CHECK(vm_get_count() >= 2);
@@ -321,7 +326,8 @@ TEST_F(vm, vm_notifications_set_and_get)
 	struct_vm *current_vm;
 	struct vm_locked current_vm_locked;
 	struct_vm *dummy_sender;
-	ffa_notifications_bitmap_t global = 0x00000000FFFFFFFFU;
+	ffa_notifications_bitmap_t global =
+		ffa_notification_bitmap_from_legacy_u64(0x00000000FFFFFFFFU);
 	ffa_notifications_bitmap_t ret;
 	struct notifications *notifications;
 	const bool is_from_vm = true;
@@ -343,15 +349,18 @@ TEST_F(vm, vm_notifications_set_and_get)
 	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
 					       global);
 
-	EXPECT_EQ(notifications->global.pending, global);
+	EXPECT_EQ(ffa_notification_bitmap_low64(notifications->global.pending),
+		  ffa_notification_bitmap_low64(global));
 
 	/* Counter should track pending notifications. */
 	EXPECT_FALSE(vm_is_notifications_pending_count_zero());
 
 	ret = vm_notifications_partition_get_pending(current_vm_locked,
 						     is_from_vm);
-	EXPECT_EQ(ret, global);
-	EXPECT_EQ(notifications->global.pending, 0ull);
+	EXPECT_EQ(ffa_notification_bitmap_low64(ret),
+		  ffa_notification_bitmap_low64(global));
+	EXPECT_TRUE(
+		ffa_notification_bitmap_is_zero(notifications->global.pending));
 
 	/*
 	 * After getting the pending notifications, the pending count should
@@ -370,7 +379,8 @@ TEST_F(vm, vm_notifications_set_and_get)
  */
 TEST_F(vm, vm_notifications_info_get_global)
 {
-	ffa_notifications_bitmap_t to_set = 0xFU;
+	ffa_notifications_bitmap_t to_set =
+		ffa_notification_bitmap_from_legacy_u64(0xFULL);
 	ffa_notifications_bitmap_t got;
 
 	/**
@@ -408,7 +418,9 @@ TEST_F(vm, vm_notifications_info_get_global)
 		EXPECT_EQ(ids_count, i + 1);
 		EXPECT_EQ(lists_count, i + 1);
 		EXPECT_EQ(lists_sizes[i], 0);
-		EXPECT_EQ(to_set, notifications->global.info_get_retrieved);
+		EXPECT_EQ(ffa_notification_bitmap_low64(to_set),
+			  ffa_notification_bitmap_low64(
+				  notifications->global.info_get_retrieved));
 
 		/* Action must be reset to initial state for each VM. */
 		current_state = INIT;
@@ -420,10 +432,13 @@ TEST_F(vm, vm_notifications_info_get_global)
 		 */
 		got = vm_notifications_partition_get_pending(current_vm_locked,
 							     is_from_vm);
-		EXPECT_EQ(got, to_set);
+		EXPECT_EQ(ffa_notification_bitmap_low64(got),
+			  ffa_notification_bitmap_low64(to_set));
 
-		EXPECT_EQ(notifications->global.info_get_retrieved, 0U);
-		EXPECT_EQ(notifications->global.pending, 0U);
+		EXPECT_TRUE(ffa_notification_bitmap_is_zero(
+			notifications->global.info_get_retrieved));
+		EXPECT_TRUE(ffa_notification_bitmap_is_zero(
+			notifications->global.pending));
 
 		vm_unlock(&current_vm_locked);
 	}
@@ -455,8 +470,9 @@ TEST_F(vm, vm_notifications_info_get_full_global)
 	notifications = &current_vm->notifications.from_sp;
 
 	/* Set global notification. */
-	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
-					       FFA_NOTIFICATION_MASK(10));
+	vm_notifications_partition_set_pending(
+		current_vm_locked, is_from_vm,
+		ffa_notification_bitmap_single(10));
 
 	/* Get notifications info for the given notifications. */
 	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
@@ -465,14 +481,19 @@ TEST_F(vm, vm_notifications_info_get_full_global)
 					  &current_state);
 
 	/* Expect 'info_get_retrieved' bitmap to be 0. */
-	EXPECT_EQ(notifications->global.info_get_retrieved, 0U);
-	EXPECT_EQ(notifications->global.pending, FFA_NOTIFICATION_MASK(10));
+	EXPECT_TRUE(ffa_notification_bitmap_is_zero(
+		notifications->global.info_get_retrieved));
+	EXPECT_EQ(ffa_notification_bitmap_low64(notifications->global.pending),
+		  ffa_notification_bitmap_low64(
+			  ffa_notification_bitmap_single(10)));
 	EXPECT_EQ(ids_count, FFA_NOTIFICATIONS_INFO_GET_MAX_IDS);
 	EXPECT_EQ(current_state, FULL);
 
 	got = vm_notifications_partition_get_pending(current_vm_locked,
 						     is_from_vm);
-	EXPECT_EQ(got, FFA_NOTIFICATION_MASK(10));
+	EXPECT_EQ(ffa_notification_bitmap_low64(got),
+		  ffa_notification_bitmap_low64(
+			  ffa_notification_bitmap_single(10)));
 
 	vm_unlock(&current_vm_locked);
 }
@@ -485,7 +506,8 @@ TEST_F(vm, vm_notifications_info_get_from_framework)
 	uint32_t lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
 	uint32_t lists_count = 0;
 
-	vm_notifications_framework_set_pending(vm_locked, 0x1U);
+	vm_notifications_framework_set_pending(
+		vm_locked, ffa_notification_bitmap_single(0));
 
 	/* Get notifications info for the given notifications. */
 	vm_notifications_info_get(vm_locked, ids, &ids_count, lists_sizes,
@@ -497,7 +519,9 @@ TEST_F(vm, vm_notifications_info_get_from_framework)
 	EXPECT_EQ(lists_sizes[0], 0);
 	EXPECT_EQ(lists_count, 1);
 
-	EXPECT_EQ(vm_notifications_framework_get_pending(vm_locked), 0x1U);
+	EXPECT_EQ(ffa_notification_bitmap_low64(
+			  vm_notifications_framework_get_pending(vm_locked)),
+		  0x1U);
 
 	vm_unlock(&vm_locked);
 }
