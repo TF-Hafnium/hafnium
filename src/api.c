@@ -3900,6 +3900,14 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		return ffa_error(FFA_NO_MEMORY);
 	}
 
+	/*
+	 * Track the allocation in `memory_region` right away so that every
+	 * `goto out` path below frees it. Ownership is only handed off (by
+	 * clearing `memory_region`) once it is passed to `ffa_memory_send()`
+	 * or `ffa_memory_other_world_mem_send()`.
+	 */
+	memory_region = allocated_entry;
+
 	if (!memcpy_trapped(allocated_entry, allocated_entry_size, from_msg,
 			    fragment_length)) {
 		dlog_error(
@@ -3927,7 +3935,6 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		goto out;
 	}
 
-	memory_region = allocated_entry;
 	fragment_offset_delta =
 		(int32_t)fragment_length_new - (int32_t)fragment_length;
 
