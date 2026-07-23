@@ -1646,6 +1646,69 @@ static inline bool is_ffa_spm_buffer_full_notification(
 		framework, FFA_NOTIFICATION_SPM_BUFFER_FULL_ID);
 }
 
+/*
+ * Convert extended notification bitmaps between their internal
+ * representation and the register layouts used by the extended
+ * notification interfaces.
+ */
+static inline ffa_notifications_bitmap_t ffa_notification_bitmap_from_regs(
+	uint64_t reg3, uint64_t reg4, uint64_t reg5, uint64_t reg6,
+	uint64_t reg7, uint64_t reg8)
+{
+	ffa_notifications_bitmap_t out;
+
+	ffa_notification_bitmap_init(&out);
+	out.words[0] = reg3;
+	out.words[1] = reg4;
+	out.words[2] = reg5;
+	out.words[3] = reg6;
+	out.words[4] = reg7;
+	out.words[5] = reg8;
+	return out;
+}
+
+static inline void ffa_notification_bitmap_to_regs(
+	ffa_notifications_bitmap_t bitmap, uint64_t *reg3, uint64_t *reg4,
+	uint64_t *reg5, uint64_t *reg6, uint64_t *reg7, uint64_t *reg8)
+{
+	*reg3 = bitmap.words[0];
+	*reg4 = bitmap.words[1];
+	*reg5 = bitmap.words[2];
+	*reg6 = bitmap.words[3];
+	*reg7 = bitmap.words[4];
+	*reg8 = bitmap.words[5];
+}
+
+static inline ffa_notifications_bitmap_t ffa_notification_bitmap_from_x3_x8(
+	struct ffa_value args)
+{
+	return ffa_notification_bitmap_from_regs(
+		args.arg3, args.arg4, args.arg5, args.arg6, args.arg7,
+		args.extended_val.arg8);
+}
+
+static inline ffa_notifications_bitmap_t ffa_notification_bitmap_from_x9_x14(
+	struct ffa_value args)
+{
+	return ffa_notification_bitmap_from_regs(
+		args.extended_val.arg9, args.extended_val.arg10,
+		args.extended_val.arg11, args.extended_val.arg12,
+		args.extended_val.arg13, args.extended_val.arg14);
+}
+
+/* GET2-specific bitmap extraction helpers. */
+static inline ffa_notifications_bitmap_t ffa_notification_bitmap_from_get2_sp(
+	struct ffa_value args)
+{
+	return ffa_notification_bitmap_from_x3_x8(args);
+}
+
+static inline ffa_notifications_bitmap_t ffa_notification_bitmap_from_get2_vm(
+	struct ffa_value args)
+{
+	return ffa_notification_bitmap_from_x9_x14(args);
+}
+
 /**
  * Helper function to assemble a 64-bit sized bitmap, from the 32-bit sized low
  * and high.
