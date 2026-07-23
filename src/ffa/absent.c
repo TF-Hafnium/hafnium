@@ -6,6 +6,8 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include <stdint.h>
+
 #include "hf/api.h"
 #include "hf/ffa.h"
 #include "hf/ffa_internal.h"
@@ -209,6 +211,14 @@ bool ffa_notifications_update_bindings2_forward(
 	/*
 	 * No other FF-A world is present, so the request cannot be forwarded.
 	 */
+	return false;
+}
+
+bool ffa_notifications_set2_forward(struct ffa_value request,
+				    struct ffa_value *ret)
+{
+	(void)request;
+	(void)ret;
 	return false;
 }
 

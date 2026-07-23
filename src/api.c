@@ -6313,3 +6313,135 @@ struct ffa_value api_ffa_notification_update_bindings2(
 		sender_vm_id, receiver_vm_id, notifications, is_bind,
 		FFA_VERSION_1_3);
 }
+
+/**
+ * Handle FFA_NOTIFICATION_SET2.
+ *
+ * Validate the caller, endpoint relationship, flags and extended notification
+ * bitmap, then forward the request when the receiver belongs to the other
+ * FF-A world. Otherwise, verify the receiver's bindings, mark the selected
+ * notifications pending and trigger or delay the SRI as requested.
+ */
+struct ffa_value api_ffa_notification_set2(
+	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id, uint64_t flags,
+	ffa_notifications_bitmap_t notifications, struct vcpu *current,
+	struct ffa_value args)
+{
+	struct ffa_value ret;
+	struct vm_locked receiver_locked;
+	const bool is_per_vcpu = (flags & FFA_NOTIFICATION_FLAG_PER_VCPU) != 0U;
+	const bool delay_sri = (flags & FFA_NOTIFICATIONS_FLAG_DELAY_SRI) != 0U;
+	const uint64_t flags_mbz = UINT64_C(0xFFFC);
+	const uint64_t receiver_vcpu_id = flags >> 16;
+
+	assert(args.extended_val.valid);
+
+	/* Registers x9-x17 are reserved and must be zero for SET2. */
+	if ((args.extended_val.arg9 | args.extended_val.arg10 |
+	     args.extended_val.arg11 | args.extended_val.arg12 |
+	     args.extended_val.arg13 | args.extended_val.arg14 |
+	     args.extended_val.arg15 | args.extended_val.arg16 |
+	     args.extended_val.arg17) != 0U) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if ((flags & flags_mbz) != 0U) {
+		dlog_verbose("%s: caller shouldn't set bits that MBZ.\n",
+			     __func__);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+	if (is_per_vcpu) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+	if (receiver_vcpu_id != 0U) {
+		dlog_verbose(
+			"For global notifications vCPU ID MBZ in call to set "
+			"notifications.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+	if (!ffa_notifications_is_set_valid(current, sender_vm_id,
+					    receiver_vm_id)) {
+		dlog_verbose("Invalid use of notifications set2 interface.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (current->vm->ffa_version < FFA_VERSION_1_3) {
+		dlog_verbose("%s: caller (%x) must support FF-A v1.3.\n",
+			     __func__, current->vm->id);
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	if (ffa_notification_bitmap_is_zero(notifications)) {
+		dlog_verbose("No notifications have been specified.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/**
+	 * Delay-SRI semantics are local to the Secure virtual FF-A instance
+	 * and must not be requested by a sender in the other FF-A world.
+	 */
+	if (ffa_is_vm_id(sender_vm_id) && delay_sri) {
+		dlog_verbose(
+			"The delay SRI flag can only be set at the secure "
+			"virtual FF-A instance.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/**
+	 * Forward the request if the Receiver's notification state is
+	 * maintained by the partition manager in the other FF-A world.
+	 */
+	if (ffa_notifications_set2_forward(args, &ret)) {
+		return ret;
+	}
+
+	receiver_locked = ffa_vm_find_locked(receiver_vm_id);
+	if (receiver_locked.vm == NULL) {
+		dlog_verbose("Receiver ID is not valid.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (receiver_locked.vm->ffa_version < FFA_VERSION_1_3) {
+		dlog_verbose("%s: receiver (%x) must support FF-A v1.3.\n",
+			     __func__, receiver_locked.vm->id);
+		ret = ffa_error(FFA_NOT_SUPPORTED);
+		goto out;
+	}
+
+	if (!vm_locked_are_notifications_enabled(receiver_locked)) {
+		dlog_verbose("Receiver's notifications not enabled.\n");
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
+
+	/**
+	 * Every selected notification must have previously been bound to this
+	 * sender by the Receiver through BIND or BIND2.
+	 */
+	if (!vm_notifications_validate_binding(receiver_locked,
+					       ffa_is_vm_id(sender_vm_id),
+					       sender_vm_id, notifications)) {
+		dlog_verbose("Notifications not bound to sender.\n");
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
+
+	/* Pend the selected notifications in the bitmap for sender's type. */
+	vm_notifications_partition_set_pending(
+		receiver_locked, ffa_is_vm_id(sender_vm_id), notifications);
+
+	/**
+	 * The notification state is already pending; now inform the Receiver's
+	 * scheduler immediately or defer the SRI as requested.
+	 */
+	if (!delay_sri) {
+		ffa_notifications_sri_trigger_not_delayed(current->cpu);
+	} else {
+		ffa_notifications_sri_set_delayed(current->cpu);
+	}
+
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+out:
+	vm_unlock(&receiver_locked);
+	return ret;
+}

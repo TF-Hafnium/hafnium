@@ -35,6 +35,9 @@ bool ffa_notifications_set_forward(ffa_id_t sender_vm_id,
 				   ffa_notifications_bitmap_t bitmap,
 				   struct ffa_value *ret);
 
+bool ffa_notifications_set2_forward(struct ffa_value request,
+				    struct ffa_value *ret);
+
 bool ffa_notifications_is_get_valid(struct vcpu *current, ffa_id_t receiver_id,
 				    ffa_notification_flags_t flags);
 

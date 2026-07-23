@@ -199,6 +199,15 @@ bool ffa_notifications_set_forward(ffa_id_t sender_vm_id,
 	return false;
 }
 
+bool ffa_notifications_set2_forward(struct ffa_value request,
+				    struct ffa_value *ret)
+{
+	(void)request;
+	(void)ret;
+
+	return false;
+}
+
 bool ffa_notifications_is_get_valid(struct vcpu *current, ffa_id_t receiver_id,
 				    ffa_notification_flags_t flags)
 {

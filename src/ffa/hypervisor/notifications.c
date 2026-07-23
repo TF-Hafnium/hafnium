@@ -140,6 +140,21 @@ bool ffa_notifications_set_forward(ffa_id_t sender_vm_id,
 	return true;
 }
 
+bool ffa_notifications_set2_forward(struct ffa_value request,
+				    struct ffa_value *ret)
+{
+	if (vm_id_is_current_world(ffa_receiver(request))) {
+		return false;
+	}
+
+	dlog_verbose("Forwarding notification set2 to SPMC.\n");
+
+	request.arg2 &= ~FFA_NOTIFICATIONS_FLAG_DELAY_SRI;
+	*ret = arch_other_world_call_ext(request);
+
+	return true;
+}
+
 bool ffa_notifications_is_get_valid(struct vcpu *current, ffa_id_t receiver_id,
 				    ffa_notification_flags_t flags)
 {
