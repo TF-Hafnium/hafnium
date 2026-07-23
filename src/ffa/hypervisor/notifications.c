@@ -10,6 +10,7 @@
 
 #include "hf/arch/other_world.h"
 
+#include "hf/ffa.h"
 #include "hf/ffa/init.h"
 #include "hf/ffa_internal.h"
 #include "hf/std.h"
@@ -61,6 +62,45 @@ bool ffa_notifications_update_bindings_forward(
 		});
 		return true;
 	}
+	return false;
+}
+
+bool ffa_notifications_update_bindings2_forward(
+	ffa_id_t receiver_id, ffa_id_t sender_id, uint64_t flags,
+	ffa_notifications_bitmap_t bitmap, bool is_bind, struct ffa_value *ret)
+{
+	CHECK(ret != NULL);
+
+	/*
+	 * When Hafnium is the hypervisor, an SP-to-VM notification binding
+	 * must be forwarded to the SPMC. The VM is the receiver in the
+	 * hypervisor's world, while the SP sender belongs to the other world.
+	 */
+	if (vm_id_is_current_world(receiver_id) &&
+	    !vm_id_is_current_world(sender_id)) {
+		struct ffa_value args = {
+			.func = is_bind ? FFA_NOTIFICATION_BIND2_64
+					: FFA_NOTIFICATION_UNBIND2_64,
+			.arg1 = ((uint64_t)sender_id << 16) | receiver_id,
+			.arg2 = is_bind ? flags : 0U,
+			.extended_val.valid = true,
+		};
+
+		dlog_verbose(
+			"Forward notifications bind2/unbind2 to other "
+			"world.\n");
+
+		/* BIND2 and UNBIND2 carry the 384-bit bitmap in x3-x8. */
+		ffa_notification_bitmap_to_regs(
+			bitmap, &args.arg3, &args.arg4, &args.arg5, &args.arg6,
+			&args.arg7, &args.extended_val.arg8);
+
+		*ret = arch_other_world_call_ext(args);
+
+		/* The request was handled by the other FF-A world. */
+		return true;
+	}
+	/* Continue handling the binding locally. */
 	return false;
 }
 

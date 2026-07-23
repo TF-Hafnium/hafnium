@@ -21,6 +21,11 @@ bool ffa_notifications_update_bindings_forward(
 	ffa_notification_flags_t flags, ffa_notifications_bitmap_t bitmap,
 	bool is_bind, struct ffa_value *ret);
 
+/* Forwarding helpers for v1.3 extended notification ABIs. */
+bool ffa_notifications_update_bindings2_forward(
+	ffa_id_t receiver_id, ffa_id_t sender_id, uint64_t flags,
+	ffa_notifications_bitmap_t bitmap, bool is_bind, struct ffa_value *ret);
+
 bool ffa_notifications_is_set_valid(struct vcpu *current, ffa_id_t sender_id,
 				    ffa_id_t receiver_id);
 

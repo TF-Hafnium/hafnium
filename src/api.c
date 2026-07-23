@@ -4768,120 +4768,6 @@ struct ffa_value api_ffa_notification_bitmap_destroy(ffa_id_t vm_id,
 	return ffa_notifications_bitmap_destroy(vm_id);
 }
 
-struct ffa_value api_ffa_notification_update_bindings(
-	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id, uint32_t flags,
-	ffa_notifications_bitmap_t notifications, bool is_bind,
-	struct vcpu *current)
-{
-	struct ffa_value ret = {.func = FFA_SUCCESS_32};
-	struct vm_locked receiver_locked;
-	const bool is_per_vcpu = (flags & FFA_NOTIFICATION_FLAG_PER_VCPU) != 0U;
-	const ffa_id_t id_to_update = is_bind ? sender_vm_id : HF_INVALID_VM_ID;
-	const ffa_id_t id_to_validate =
-		is_bind ? HF_INVALID_VM_ID : sender_vm_id;
-	const uint32_t flags_mbz = ~0U;
-
-	/**
-	 * Per-vCPU delivery unsupported: must reject requests using the flag.
-	 */
-	if (is_per_vcpu) {
-		dlog_verbose("%s: per-vCPU flag not supported.\n", __func__);
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	if ((flags_mbz & flags) != 0U) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	if (!ffa_notifications_is_bind_valid(current, sender_vm_id,
-					     receiver_vm_id)) {
-		dlog_verbose("Invalid use of notifications bind interface.\n");
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	if (ffa_notifications_update_bindings_forward(
-		    receiver_vm_id, sender_vm_id, flags, notifications, is_bind,
-		    &ret)) {
-		return ret;
-	}
-
-	if (ffa_notification_bitmap_is_zero(notifications)) {
-		dlog_verbose("No notifications have been specified %lx.\n",
-			     ffa_notification_bitmap_low64(notifications));
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/**
-	 * This check assumes receiver is the current VM, and has been enforced
-	 * by 'ffa_notifications_is_bind_valid'.
-	 */
-	receiver_locked = ffa_vm_find_locked(receiver_vm_id);
-
-	if (receiver_locked.vm == NULL) {
-		dlog_verbose("Receiver doesn't exist!\n");
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	if (receiver_locked.vm->ffa_version < FFA_VERSION_1_1) {
-		dlog_verbose(
-			"%s: caller (%x) version should be GE to FF-A v1.1.\n",
-			__func__, receiver_locked.vm->id);
-		ret = ffa_error(FFA_NOT_SUPPORTED);
-		goto out;
-	}
-
-	if (!vm_locked_are_notifications_enabled(receiver_locked)) {
-		dlog_verbose("Notifications are not enabled.\n");
-		ret = ffa_error(FFA_NOT_SUPPORTED);
-		goto out;
-	}
-
-	if (is_bind && vm_id_is_current_world(sender_vm_id) &&
-	    vm_find(sender_vm_id) == NULL) {
-		dlog_verbose("Sender VM does not exist!\n");
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-
-	/*
-	 * Can't bind/unbind notifications if at least one is bound to a
-	 * different sender.
-	 */
-	if (!vm_notifications_validate_bound_sender(
-		    receiver_locked, ffa_is_vm_id(sender_vm_id), id_to_validate,
-		    notifications)) {
-		dlog_verbose(
-			"Sender %x not permitted to set notifications %lx to "
-			"%x.\n",
-			sender_vm_id,
-			ffa_notification_bitmap_low64(notifications),
-			receiver_vm_id);
-		ret = ffa_error(FFA_DENIED);
-		goto out;
-	}
-
-	/**
-	 * Check if there is a pending notification within those specified in
-	 * the bitmap.
-	 */
-	if (vm_are_notifications_pending(receiver_locked,
-					 ffa_is_vm_id(sender_vm_id),
-					 notifications)) {
-		dlog_verbose("Notifications within '%lx' pending.\n",
-			     ffa_notification_bitmap_low64(notifications));
-		ret = ffa_error(FFA_DENIED);
-		goto out;
-	}
-
-	vm_notifications_update_bindings(receiver_locked,
-					 ffa_is_vm_id(sender_vm_id),
-					 id_to_update, notifications);
-
-out:
-	vm_unlock(&receiver_locked);
-	return ret;
-}
-
 struct ffa_value api_ffa_notification_set(
 	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id, uint32_t flags,
 	ffa_notifications_bitmap_t notifications, struct vcpu *current)
@@ -6249,4 +6135,181 @@ void ffa_ns_res_info_get_state_reset(void)
 	ffa_ns_res_state.written_size = 0;
 
 	sl_unlock(&ffa_ns_res_state.lock_instance);
+}
+
+/**
+ * Validate and update notification bindings maintained in this FF-A world.
+ */
+static struct ffa_value ffa_notifications_update_bindings_local(
+	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id,
+	ffa_notifications_bitmap_t notifications, bool is_bind,
+	enum ffa_version minimum_version)
+{
+	struct ffa_value ret = {.func = FFA_SUCCESS_32};
+	struct vm_locked receiver_locked;
+	const ffa_id_t id_to_update = is_bind ? sender_vm_id : HF_INVALID_VM_ID;
+	const ffa_id_t id_to_validate =
+		is_bind ? HF_INVALID_VM_ID : sender_vm_id;
+
+	receiver_locked = ffa_vm_find_locked(receiver_vm_id);
+	if (receiver_locked.vm == NULL) {
+		dlog_verbose("Receiver doesn't exist!\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (receiver_locked.vm->ffa_version < minimum_version) {
+		dlog_verbose(
+			"%s: receiver (%x) does not support the required "
+			"FF-A version.\n",
+			__func__, receiver_locked.vm->id);
+		ret = ffa_error(FFA_NOT_SUPPORTED);
+		goto out;
+	}
+
+	if (!vm_locked_are_notifications_enabled(receiver_locked)) {
+		dlog_verbose("Notifications are not enabled.\n");
+		ret = ffa_error(FFA_NOT_SUPPORTED);
+		goto out;
+	}
+
+	if (is_bind && vm_id_is_current_world(sender_vm_id) &&
+	    vm_find(sender_vm_id) == NULL) {
+		dlog_verbose("Sender VM does not exist!\n");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	/*
+	 * BIND requires the notifications to be unbound. UNBIND requires them
+	 * to be bound to the specified sender.
+	 */
+	if (!vm_notifications_validate_bound_sender(
+		    receiver_locked, ffa_is_vm_id(sender_vm_id), id_to_validate,
+		    notifications)) {
+		dlog_verbose(
+			"Sender %x not permitted to set notifications %lx to "
+			"%x.\n",
+			sender_vm_id,
+			ffa_notification_bitmap_low64(notifications),
+			receiver_vm_id);
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
+
+	/* A notification binding cannot be changed while it is pending. */
+	if (vm_are_notifications_pending(receiver_locked,
+					 ffa_is_vm_id(sender_vm_id),
+					 notifications)) {
+		dlog_verbose("Notifications within '%lx' pending.\n",
+			     ffa_notification_bitmap_low64(notifications));
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
+
+	vm_notifications_update_bindings(receiver_locked,
+					 ffa_is_vm_id(sender_vm_id),
+					 id_to_update, notifications);
+
+out:
+	vm_unlock(&receiver_locked);
+	return ret;
+}
+
+struct ffa_value api_ffa_notification_update_bindings(
+	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id, uint32_t flags,
+	ffa_notifications_bitmap_t notifications, bool is_bind,
+	struct vcpu *current)
+{
+	struct ffa_value ret = {.func = FFA_SUCCESS_32};
+	const bool is_per_vcpu = (flags & FFA_NOTIFICATION_FLAG_PER_VCPU) != 0U;
+	const uint32_t flags_mbz = ~0U;
+
+	if (is_per_vcpu) {
+		dlog_verbose("%s: per-vCPU flag not supported.\n", __func__);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if ((flags & flags_mbz) != 0U) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (!ffa_notifications_is_bind_valid(current, sender_vm_id,
+					     receiver_vm_id)) {
+		dlog_verbose("Invalid use of notifications bind interface.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (ffa_notification_bitmap_is_zero(notifications)) {
+		dlog_verbose("No notifications have been specified.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (ffa_notifications_update_bindings_forward(
+		    receiver_vm_id, sender_vm_id, flags, notifications, is_bind,
+		    &ret)) {
+		return ret;
+	}
+
+	return ffa_notifications_update_bindings_local(
+		sender_vm_id, receiver_vm_id, notifications, is_bind,
+		FFA_VERSION_1_1);
+}
+
+/**
+ * Handle FFA_NOTIFICATION_BIND2 and FFA_NOTIFICATION_UNBIND2.
+ *
+ * Validate the caller, endpoint relationship and flags, then forward the
+ * request when its authoritative notification state belongs to the other
+ * FF-A world. Otherwise, validate the receiver, existing bindings and
+ * pending state before updating the selected notification IDs locally.
+ */
+struct ffa_value api_ffa_notification_update_bindings2(
+	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id, uint64_t flags,
+	ffa_notifications_bitmap_t notifications, bool is_bind,
+	struct vcpu *current)
+{
+	struct ffa_value ret = {.func = FFA_SUCCESS_32};
+
+	/*
+	 * FF-A v1.3 Section 11.3 requires consumers to ignore undefined data
+	 * locations. Keep only the flag defined for BIND2; UNBIND2 has no
+	 * defined flags.
+	 */
+	const uint64_t defined_flags =
+		is_bind ? (flags & (uint64_t)FFA_NOTIFICATION_FLAG_PER_VCPU)
+			: 0U;
+	const bool is_per_vcpu =
+		(defined_flags & FFA_NOTIFICATION_FLAG_PER_VCPU) != 0U;
+
+	if (is_per_vcpu) {
+		dlog_verbose("%s: per-vCPU flag not supported.\n", __func__);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (!ffa_notifications_is_bind_valid(current, sender_vm_id,
+					     receiver_vm_id)) {
+		dlog_verbose("Invalid use of notifications bind2 interface.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (current->vm->ffa_version < FFA_VERSION_1_3) {
+		dlog_verbose("%s: caller (%x) must support FF-A v1.3.\n",
+			     __func__, current->vm->id);
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	if (ffa_notification_bitmap_is_zero(notifications)) {
+		dlog_verbose("No notifications have been specified.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (ffa_notifications_update_bindings2_forward(
+		    receiver_vm_id, sender_vm_id, defined_flags, notifications,
+		    is_bind, &ret)) {
+		return ret;
+	}
+
+	return ffa_notifications_update_bindings_local(
+		sender_vm_id, receiver_vm_id, notifications, is_bind,
+		FFA_VERSION_1_3);
 }

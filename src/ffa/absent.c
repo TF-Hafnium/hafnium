@@ -196,6 +196,22 @@ bool ffa_notifications_update_bindings_forward(
 	return false;
 }
 
+bool ffa_notifications_update_bindings2_forward(
+	ffa_id_t receiver_id, ffa_id_t sender_id, uint64_t flags,
+	ffa_notifications_bitmap_t bitmap, bool is_bind, struct ffa_value *ret)
+{
+	(void)receiver_id;
+	(void)sender_id;
+	(void)flags;
+	(void)bitmap;
+	(void)is_bind;
+	(void)ret;
+	/*
+	 * No other FF-A world is present, so the request cannot be forwarded.
+	 */
+	return false;
+}
+
 bool ffa_notifications_is_set_valid(struct vcpu *current, ffa_id_t sender_id,
 				    ffa_id_t receiver_id)
 {

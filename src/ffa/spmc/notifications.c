@@ -114,6 +114,23 @@ bool ffa_notifications_update_bindings_forward(
 	return false;
 }
 
+bool ffa_notifications_update_bindings2_forward(
+	ffa_id_t receiver_id, ffa_id_t sender_id, uint64_t flags,
+	ffa_notifications_bitmap_t bitmap, bool is_bind, struct ffa_value *ret)
+{
+	(void)receiver_id;
+	(void)sender_id;
+	(void)flags;
+	(void)bitmap;
+	(void)is_bind;
+	(void)ret;
+	/*
+	 * The SPMC handles notification bindings locally and does not forward
+	 * them to another FF-A world.
+	 */
+	return false;
+}
+
 /*
  * - A set call cannot be from an SPMD logical partition or target an
  * SPMD logical partition.
