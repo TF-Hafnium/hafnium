@@ -562,6 +562,11 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 			ffa_receiver(*args), ffa_notifications_get_vcpu(*args),
 			args->arg2, current);
 		return true;
+	case FFA_NOTIFICATION_GET2_64:
+		*args = api_ffa_notification_get2(
+			ffa_receiver(*args), ffa_notifications_get_vcpu(*args),
+			args->arg2, current, *args);
+		return true;
 	case FFA_NOTIFICATION_INFO_GET_64:
 		*args = api_ffa_notification_info_get(current);
 		return true;

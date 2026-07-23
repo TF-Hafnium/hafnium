@@ -280,6 +280,10 @@ static struct ffa_value arch_regs_get_args_ext(struct arch_regs *regs)
 	};
 }
 
+/**
+ * These FF-A interfaces extend their ABI beyond the base argument registers,
+ * so capture the full register set, including the extended x8+ arguments.
+ */
 struct ffa_value arch_regs_get_args(struct arch_regs *regs)
 {
 	uint32_t func_id = regs->r[0];
@@ -289,6 +293,7 @@ struct ffa_value arch_regs_get_args(struct arch_regs *regs)
 	    func_id == FFA_NOTIFICATION_BIND2_64 ||
 	    func_id == FFA_NOTIFICATION_UNBIND2_64 ||
 	    func_id == FFA_NOTIFICATION_SET2_64 ||
+	    func_id == FFA_NOTIFICATION_GET2_64 ||
 	    (func_id == FFA_CONSOLE_LOG_64 &&
 	     FFA_VERSION_1_2 <= FFA_VERSION_COMPILED)) {
 		return arch_regs_get_args_ext(regs);

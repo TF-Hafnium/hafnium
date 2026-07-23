@@ -415,8 +415,39 @@ void vm_notifications_update_bindings(struct vm_locked vm_locked,
 void vm_notifications_partition_set_pending(
 	struct vm_locked vm_locked, bool is_from_vm,
 	ffa_notifications_bitmap_t notifications);
+
+/**
+ * Retrieves notification IDs 0-63 for legacy FFA_NOTIFICATION_GET.
+ * Extended notification IDs 64-383 remain pending.
+ */
 ffa_notifications_bitmap_t vm_notifications_partition_get_pending(
 	struct vm_locked vm_locked, bool is_from_vm);
+
+/**
+ * Retrieves pending partition notifications using GET2 mask semantics.
+ *
+ * If `is_from_vm` is true, notifications from VM senders are retrieved.
+ * Otherwise, notifications from SP senders are retrieved.
+ *
+ * Notifications with a clear mask bit are returned and cleared.
+ * Notifications with a set mask bit remain pending.
+ */
+ffa_notifications_bitmap_t vm_notifications_partition_get_pending_masked(
+	struct vm_locked vm_locked, bool is_from_vm,
+	ffa_notifications_bitmap_t mask);
+
+/**
+ * Retrieves pending framework notifications using GET2 mask semantics.
+ *
+ * If `is_from_hyp` is true, Hypervisor framework notifications are
+ * retrieved. Otherwise, SPMC framework notifications are retrieved.
+ *
+ * Notifications with a clear mask bit are returned and cleared.
+ * Notifications with a set mask bit remain pending.
+ */
+ffa_notifications_bitmap_t vm_notifications_framework_get_pending_masked(
+	struct vm_locked vm_locked, bool is_from_hyp,
+	ffa_notifications_bitmap_t mask);
 
 /**
  * Marks the RX-buffer-full framework notification pending.
@@ -431,6 +462,7 @@ void vm_notifications_framework_set_rx_buffer_full(struct vm_locked vm_locked,
 
 ffa_notifications_bitmap_t vm_notifications_framework_get_pending(
 	struct vm_locked vm_locked);
+
 void vm_notifications_info_get_pending(
 	struct vm_locked vm_locked, bool is_from_vm, uint16_t *ids,
 	uint32_t *ids_count, uint32_t *lists_sizes, uint32_t *lists_count,

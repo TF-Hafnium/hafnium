@@ -927,21 +927,81 @@ static ffa_notifications_bitmap_t vm_notifications_state_get_pending(
 	return to_ret;
 }
 
+static ffa_notifications_bitmap_t vm_notifications_state_get_pending_masked(
+	struct notifications_state *state, ffa_notifications_bitmap_t mask)
+{
+	ffa_notifications_bitmap_t pending;
+	ffa_notifications_bitmap_t to_ret;
+	ffa_notifications_bitmap_t to_keep;
+	ffa_notifications_bitmap_t removed_and_info_get_retrieved;
+
+	assert(state != NULL);
+
+	pending = state->pending;
+
+	/* Retrieve only the unmasked subset. */
+	to_ret = ffa_notification_bitmap_exclude(pending, mask);
+	to_keep = ffa_notification_bitmap_and(pending, mask);
+
+	/* Update counts only for notifications actually retrieved. */
+	vm_notifications_pending_count_sub(to_ret);
+
+	removed_and_info_get_retrieved =
+		ffa_notification_bitmap_and(to_ret, state->info_get_retrieved);
+
+	if (!ffa_notification_bitmap_is_zero(removed_and_info_get_retrieved)) {
+		vm_notifications_info_get_retrieved_count_sub(
+			removed_and_info_get_retrieved);
+	}
+
+	/*
+	 * Keep masked bits pending, and keep info_get_retrieved state for
+	 * masked notifications intact.
+	 */
+	state->pending = to_keep;
+	state->info_get_retrieved =
+		ffa_notification_bitmap_and(state->info_get_retrieved, mask);
+
+	return to_ret;
+}
+
 /**
- * Get global notifications for the given vCPU ID.
+ * Retrieve global notifications supported by legacy FFA_NOTIFICATION_GET.
+ *
+ * Mask bits corresponding to extended notification IDs so they remain
+ * pending for a subsequent FFA_NOTIFICATION_GET2 invocation.
  */
 ffa_notifications_bitmap_t vm_notifications_partition_get_pending(
 	struct vm_locked vm_locked, bool is_from_vm)
 {
-	ffa_notifications_bitmap_t to_ret;
+	struct notifications *to_get;
+	ffa_notifications_bitmap_t mask = ffa_notification_bitmap_all_ones();
+
+	assert(vm_locked.vm != NULL);
+
+	/**
+	 * Legacy FFA_NOTIFICATION_GET retrieves notification IDs 0-63.
+	 * A set mask bit means "keep pending". Unmask only word 0 so legacy
+	 * FFA_NOTIFICATION_GET retrieves IDs 0-63 while preserving extended
+	 * notification IDs 64-383.
+	 */
+	mask.words[0] = 0U;
+
+	to_get = vm_get_notifications(vm_locked, is_from_vm);
+
+	return vm_notifications_state_get_pending_masked(&to_get->global, mask);
+}
+
+ffa_notifications_bitmap_t vm_notifications_partition_get_pending_masked(
+	struct vm_locked vm_locked, bool is_from_vm,
+	ffa_notifications_bitmap_t mask)
+{
 	struct notifications *to_get;
 
 	assert(vm_locked.vm != NULL);
 	to_get = vm_get_notifications(vm_locked, is_from_vm);
 
-	to_ret = vm_notifications_state_get_pending(&to_get->global);
-
-	return to_ret;
+	return vm_notifications_state_get_pending_masked(&to_get->global, mask);
 }
 
 /**
@@ -970,6 +1030,20 @@ ffa_notifications_bitmap_t vm_notifications_framework_get_pending(
 			    << 32U;
 
 	return ffa_notification_bitmap_from_legacy_u64(legacy_framework);
+}
+
+ffa_notifications_bitmap_t vm_notifications_framework_get_pending_masked(
+	struct vm_locked vm_locked, bool is_from_hyp,
+	ffa_notifications_bitmap_t mask)
+{
+	struct notifications_state *state;
+
+	assert(vm_locked.vm != NULL);
+
+	state = is_from_hyp ? &vm_locked.vm->notifications.framework_from_hyp
+			    : &vm_locked.vm->notifications.framework_from_spm;
+
+	return vm_notifications_state_get_pending_masked(state, mask);
 }
 
 static bool vm_insert_notification_info_list(

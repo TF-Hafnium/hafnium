@@ -143,6 +143,11 @@ struct ffa_value api_ffa_notification_set2(
 	ffa_notifications_bitmap_t notifications, struct vcpu *current,
 	struct ffa_value args);
 
+struct ffa_value api_ffa_notification_get2(ffa_id_t receiver_vm_id,
+					   ffa_vcpu_index_t vcpu_id,
+					   uint64_t flags, struct vcpu *current,
+					   struct ffa_value args);
+
 struct ffa_value api_ffa_notification_info_get(struct vcpu *current);
 
 struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, uint32_t page_count,

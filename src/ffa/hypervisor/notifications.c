@@ -339,6 +339,96 @@ struct ffa_value ffa_notifications_get_framework_notifications(
 	return ret;
 }
 
+struct ffa_value ffa_notifications_get2_framework_notifications(
+	struct vm_locked receiver_locked, ffa_notifications_bitmap_t *from_spm,
+	ffa_notifications_bitmap_t *from_hyp,
+	ffa_notifications_bitmap_t spm_mask,
+	ffa_notifications_bitmap_t hyp_mask, ffa_notification_flags_t flags,
+	ffa_vcpu_index_t vcpu_id)
+{
+	struct ffa_value ret = {.func = FFA_SUCCESS_32};
+	ffa_id_t receiver_id = receiver_locked.vm->id;
+
+	assert(from_spm != NULL);
+	assert(from_hyp != NULL);
+
+	ffa_notification_bitmap_init(from_spm);
+	ffa_notification_bitmap_init(from_hyp);
+
+	/* SPMC framework notifications come from the other world. */
+	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_SPM) != 0U &&
+	    ffa_init_is_tee_enabled()) {
+		/*
+		 * Use GET2 to support x15 selective retrieval mask for SPM
+		 * framework notifications. Returned bitmap is in x15.
+		 */
+		ret = arch_other_world_call_ext((struct ffa_value){
+			.func = FFA_NOTIFICATION_GET2_64,
+			.arg1 = ((uint64_t)vcpu_id << 16) | receiver_id,
+			.arg2 = FFA_NOTIFICATION_FLAG_BITMAP_SPM,
+			.arg3 = 0U,
+			.arg4 = 0U,
+			.arg5 = 0U,
+			.arg6 = 0U,
+			.arg7 = 0U,
+			.extended_val.arg8 = 0U,
+			.extended_val.arg15 =
+				ffa_notification_bitmap_low64(spm_mask),
+			.extended_val.arg16 = 0U,
+			.extended_val.arg17 = 0U,
+			.extended_val.valid = true,
+		});
+		if (ffa_func_id(ret) == FFA_ERROR_32) {
+			return ret;
+		}
+		*from_spm = ffa_notification_bitmap_from_legacy_u64(
+			ret.extended_val.arg15);
+	}
+
+	/* Hypervisor framework notifications are local. */
+	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_HYP) != 0U) {
+		*from_hyp = vm_notifications_framework_get_pending_masked(
+			receiver_locked, true, hyp_mask);
+	}
+
+	return ret;
+}
+
+struct ffa_value ffa_notifications_get2_from_sp(
+	struct vm_locked receiver_locked, ffa_vcpu_index_t vcpu_id,
+	ffa_notifications_bitmap_t mask, ffa_notifications_bitmap_t *from_sp)
+{
+	struct ffa_value ret = {.func = FFA_SUCCESS_32};
+	ffa_id_t receiver_id = receiver_locked.vm->id;
+
+	struct ffa_value args = {
+		.func = FFA_NOTIFICATION_GET2_64,
+		.arg1 = ((uint64_t)vcpu_id << 16) | receiver_id,
+		.arg2 = FFA_NOTIFICATION_FLAG_BITMAP_SP,
+		.extended_val.arg15 = 0U,
+		.extended_val.arg16 = 0U,
+		.extended_val.arg17 = 0U,
+		.extended_val.valid = true,
+	};
+	assert(from_sp != NULL);
+
+	ffa_notification_bitmap_to_regs(mask, &args.arg3, &args.arg4,
+					&args.arg5, &args.arg6, &args.arg7,
+					&args.extended_val.arg8);
+	/*
+	 * GET2 requires x8.. registers, so use the _ext call and mark
+	 * extended_val.valid.
+	 */
+	ret = arch_other_world_call_ext(args);
+
+	if (ret.func == FFA_ERROR_32) {
+		return ret;
+	}
+
+	*from_sp = ffa_notification_bitmap_from_get2_sp(ret);
+	return ret;
+}
+
 /**
  * A hypervisor should send the SRI to the Primary Endpoint. Not implemented as
  * the hypervisor is only interesting for us for the sake of having a test

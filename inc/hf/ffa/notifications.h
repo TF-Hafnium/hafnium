@@ -45,9 +45,26 @@ struct ffa_value ffa_notifications_get_from_sp(
 	struct vm_locked receiver_locked, ffa_vcpu_index_t vcpu_id,
 	ffa_notifications_bitmap_t *from_sp);
 
+/*
+ * GET2 variant: supports extended bitmap return and selective retrieval masks.
+ * `mask` follows the FF-A v1.3 semantics: bits set are NOT retrieved.
+ * mask bit = 0  retrieve; clear pending
+ * mask bit = 1  do not retrieve; leave pending
+ */
+struct ffa_value ffa_notifications_get2_from_sp(
+	struct vm_locked receiver_locked, ffa_vcpu_index_t vcpu_id,
+	ffa_notifications_bitmap_t mask, ffa_notifications_bitmap_t *from_sp);
+
 struct ffa_value ffa_notifications_get_framework_notifications(
 	struct vm_locked receiver_locked, ffa_notifications_bitmap_t *from_fwk,
 	ffa_notification_flags_t flags, ffa_vcpu_index_t vcpu_id);
+
+struct ffa_value ffa_notifications_get2_framework_notifications(
+	struct vm_locked receiver_locked, ffa_notifications_bitmap_t *from_spm,
+	ffa_notifications_bitmap_t *from_hyp,
+	ffa_notifications_bitmap_t spm_mask,
+	ffa_notifications_bitmap_t hyp_mask, ffa_notification_flags_t flags,
+	ffa_vcpu_index_t vcpu_id);
 
 /**
  * Creates a bitmap for the VM of the given ID.

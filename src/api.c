@@ -4911,6 +4911,7 @@ struct ffa_value api_ffa_notification_get(ffa_id_t receiver_vm_id,
 	ffa_notifications_bitmap_t framework_notifications;
 	ffa_notifications_bitmap_t sp_notifications;
 	ffa_notifications_bitmap_t vm_notifications;
+
 	ffa_notification_bitmap_init(&framework_notifications);
 	ffa_notification_bitmap_init(&sp_notifications);
 	ffa_notification_bitmap_init(&vm_notifications);
@@ -6436,6 +6437,174 @@ struct ffa_value api_ffa_notification_set2(
 	}
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+out:
+	vm_unlock(&receiver_locked);
+	return ret;
+}
+
+/**
+ * Handle FFA_NOTIFICATION_GET2.
+ *
+ * Validate the caller, FF-A version, flags, vCPU ID and selective retrieval
+ * masks. Retrieve the requested SP, VM, SPMC and Hypervisor notification
+ * bitmaps while leaving masked notifications pending, then encode the
+ * retrieved notifications in the GET2 extended-register return layout.
+ */
+struct ffa_value api_ffa_notification_get2(ffa_id_t receiver_vm_id,
+					   ffa_vcpu_index_t vcpu_id,
+					   uint64_t flags, struct vcpu *current,
+					   struct ffa_value args)
+{
+	ffa_notifications_bitmap_t sp_mask;
+	ffa_notifications_bitmap_t vm_mask;
+	ffa_notifications_bitmap_t spm_mask;
+	ffa_notifications_bitmap_t hyp_mask;
+	ffa_notifications_bitmap_t spm_framework_notifications;
+	ffa_notifications_bitmap_t hyp_framework_notifications;
+	ffa_notifications_bitmap_t sp_notifications;
+	ffa_notifications_bitmap_t vm_notifications;
+	struct vm_locked receiver_locked;
+	struct ffa_value ret = {.func = FFA_SUCCESS_64};
+	const uint64_t flags_mbz = ~UINT64_C(0xF);
+
+	ffa_notification_bitmap_init(&spm_framework_notifications);
+	ffa_notification_bitmap_init(&hyp_framework_notifications);
+	ffa_notification_bitmap_init(&sp_notifications);
+	ffa_notification_bitmap_init(&vm_notifications);
+
+	/* GET2 uses x3-x17; ensure we captured the extended registers. */
+	assert(args.extended_val.valid);
+
+	sp_mask = ffa_notification_bitmap_from_get2_sp(args);
+	vm_mask = ffa_notification_bitmap_from_get2_vm(args);
+	spm_mask = ffa_notification_bitmap_from_legacy_u64(
+		args.extended_val.arg15);
+	hyp_mask = ffa_notification_bitmap_from_legacy_u64(
+		args.extended_val.arg16);
+
+	if ((flags & flags_mbz) != 0U) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+	if (!ffa_notifications_is_get_valid(current, receiver_vm_id,
+					    (uint32_t)flags)) {
+		dlog_verbose("Invalid use of notifications get2 interface.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (current->vm->ffa_version < FFA_VERSION_1_3) {
+		dlog_verbose(
+			"%s: caller (%x) version should be GE to FF-A v1.3.\n",
+			__func__, current->vm->id);
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	/* x17 is reserved (SBZ) for GET2. */
+	if (args.extended_val.arg17 != 0U) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Validate selective retrieval masks:
+	 * - If a bitmap is not requested, its corresponding mask must be SBZ.
+	 * - If requested, mask can be any value (bits set are not retrieved).
+	 */
+	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_SP) == 0U &&
+	    !ffa_notification_bitmap_is_zero(sp_mask)) {
+		dlog_verbose(
+			"SP bitmap not requested but mask is non-zero: 0x%lx\n",
+			ffa_notification_bitmap_low64(sp_mask));
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_VM) == 0U &&
+	    !ffa_notification_bitmap_is_zero(vm_mask)) {
+		dlog_verbose(
+			"VM bitmap not requested but mask is non-zero: 0x%lx\n",
+			ffa_notification_bitmap_low64(vm_mask));
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_SPM) == 0U &&
+	    args.extended_val.arg15 != 0U) {
+		dlog_verbose(
+			"SPM bitmap not requested but mask is non-zero: "
+			"0x%lx\n",
+			ffa_notification_bitmap_low64(spm_mask));
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_HYP) == 0U &&
+	    args.extended_val.arg16 != 0U) {
+		dlog_verbose(
+			"HYP bitmap not requested but mask is non-zero: "
+			"0x%lx\n",
+			ffa_notification_bitmap_low64(hyp_mask));
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	receiver_locked = ffa_vm_find_locked(receiver_vm_id);
+	if (receiver_locked.vm == NULL) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* Receiver vCPU ID must identify an implemented vCPU. */
+	if (receiver_locked.vm->vcpu_count <= vcpu_id) {
+		dlog_verbose(
+			"Invalid VCPU ID %u. vcpu count %u current core: "
+			"%zu!\n",
+			vcpu_id, receiver_locked.vm->vcpu_count,
+			cpu_index(current->cpu));
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_SP) != 0U) {
+		ret = ffa_notifications_get2_from_sp(
+			receiver_locked, vcpu_id, sp_mask, &sp_notifications);
+		if (ret.func == FFA_ERROR_32) {
+			goto out;
+		}
+	}
+	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_VM) != 0U) {
+		vm_notifications =
+			vm_notifications_partition_get_pending_masked(
+				receiver_locked, true, vm_mask);
+	}
+	if ((flags & (FFA_NOTIFICATION_FLAG_BITMAP_SPM |
+		      FFA_NOTIFICATION_FLAG_BITMAP_HYP)) != 0U) {
+		/* Split SPMC vs Hypervisor framework notifications. */
+		ret = ffa_notifications_get2_framework_notifications(
+			receiver_locked, &spm_framework_notifications,
+			&hyp_framework_notifications, spm_mask, hyp_mask,
+			(uint32_t)flags, vcpu_id);
+		if (ret.func == FFA_ERROR_32) {
+			goto out;
+		}
+	}
+
+	/**
+	 * Encode the retrieved SP, VM, SPMC framework and Hypervisor framework
+	 * notification bitmaps in the GET2 return-register layout.
+	 */
+
+	ret = (struct ffa_value){
+		.func = FFA_SUCCESS_64,
+		.extended_val.valid = true,
+	};
+
+	ffa_notification_bitmap_to_regs(sp_notifications, &ret.arg3, &ret.arg4,
+					&ret.arg5, &ret.arg6, &ret.arg7,
+					&ret.extended_val.arg8);
+
+	ffa_notification_bitmap_to_regs(
+		vm_notifications, &ret.extended_val.arg9,
+		&ret.extended_val.arg10, &ret.extended_val.arg11,
+		&ret.extended_val.arg12, &ret.extended_val.arg13,
+		&ret.extended_val.arg14);
+
+	ret.extended_val.arg15 =
+		ffa_notification_bitmap_low64(spm_framework_notifications);
+
+	ret.extended_val.arg16 =
+		ffa_notification_bitmap_low64(hyp_framework_notifications);
+
 out:
 	vm_unlock(&receiver_locked);
 	return ret;

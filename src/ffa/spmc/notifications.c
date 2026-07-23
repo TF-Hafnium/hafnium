@@ -357,6 +357,17 @@ struct ffa_value ffa_notifications_get_from_sp(
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
+struct ffa_value ffa_notifications_get2_from_sp(
+	struct vm_locked receiver_locked, ffa_vcpu_index_t vcpu_id,
+	ffa_notifications_bitmap_t mask, ffa_notifications_bitmap_t *from_sp)
+{
+	(void)vcpu_id;
+	assert(from_sp != NULL);
+	*from_sp = vm_notifications_partition_get_pending_masked(
+		receiver_locked, false, mask);
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
+}
+
 struct ffa_value ffa_notifications_get_framework_notifications(
 	struct vm_locked receiver_locked, ffa_notifications_bitmap_t *from_fwk,
 	ffa_notification_flags_t flags, ffa_vcpu_index_t vcpu_id)
@@ -374,6 +385,43 @@ struct ffa_value ffa_notifications_get_framework_notifications(
 	}
 
 	*from_fwk = vm_notifications_framework_get_pending(receiver_locked);
+
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
+}
+
+struct ffa_value ffa_notifications_get2_framework_notifications(
+	struct vm_locked receiver_locked, ffa_notifications_bitmap_t *from_spm,
+	ffa_notifications_bitmap_t *from_hyp,
+	ffa_notifications_bitmap_t spm_mask,
+	ffa_notifications_bitmap_t hyp_mask, ffa_notification_flags_t flags,
+	ffa_vcpu_index_t vcpu_id)
+{
+	(void)vcpu_id;
+	assert(from_spm != NULL);
+	assert(from_hyp != NULL);
+
+	ffa_notification_bitmap_init(from_spm);
+	ffa_notification_bitmap_init(from_hyp);
+
+	if (!vm_id_is_current_world(receiver_locked.vm->id) &&
+	    (flags & FFA_NOTIFICATION_FLAG_BITMAP_HYP) != 0U) {
+		dlog_error(
+			"Notification get flag from hypervisor in call to SPMC "
+			"MBZ.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* SPMC framework notifications are local. */
+	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_SPM) != 0U) {
+		*from_spm = vm_notifications_framework_get_pending_masked(
+			receiver_locked, false, spm_mask);
+	}
+
+	/* Hypervisor framework notifications for an SP are managed locally. */
+	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_HYP) != 0U) {
+		*from_hyp = vm_notifications_framework_get_pending_masked(
+			receiver_locked, true, hyp_mask);
+	}
 
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }

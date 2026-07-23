@@ -251,6 +251,17 @@ struct ffa_value ffa_notifications_get_from_sp(
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
 
+struct ffa_value ffa_notifications_get2_from_sp(
+	struct vm_locked receiver_locked, ffa_vcpu_index_t vcpu_id,
+	ffa_notifications_bitmap_t mask, ffa_notifications_bitmap_t *from_sp)
+{
+	(void)receiver_locked;
+	(void)vcpu_id;
+	(void)mask;
+	(void)from_sp;
+	return ffa_error(FFA_NOT_SUPPORTED);
+}
+
 struct ffa_value ffa_notifications_get_framework_notifications(
 	struct vm_locked receiver_locked,  // NOLINTNEXTLINE
 	ffa_notifications_bitmap_t *from_fwk, ffa_notification_flags_t flags)
@@ -258,6 +269,25 @@ struct ffa_value ffa_notifications_get_framework_notifications(
 	(void)receiver_locked;
 	(void)from_fwk;
 	(void)flags;
+
+	return ffa_error(FFA_NOT_SUPPORTED);
+}
+
+struct ffa_value ffa_notifications_get2_framework_notifications(
+	struct vm_locked receiver_locked,  // NOLINTNEXTLINE
+	ffa_notifications_bitmap_t *from_spm,
+	ffa_notifications_bitmap_t *from_hyp,
+	ffa_notifications_bitmap_t spm_mask,
+	ffa_notifications_bitmap_t hyp_mask, ffa_notification_flags_t flags,
+	ffa_vcpu_index_t vcpu_id)
+{
+	(void)receiver_locked;
+	(void)from_spm;
+	(void)from_hyp;
+	(void)spm_mask;
+	(void)hyp_mask;
+	(void)flags;
+	(void)vcpu_id;
 
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
