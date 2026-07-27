@@ -165,7 +165,7 @@ tidy: $(OUT_DIR)/build.ninja
 .PHONY: license_
 license_:
 	@find build/ inc/ src/ test/ vmlib/ -name '*.S' -o -name '*.c' -o -name '*.cc' -o -name '*.h' -o -name '*.dts' -o -name '*.ld' | xargs -n1 python3 build/license.py --style c
-	@find build/ kokoro/ test/ -name '*.py' -o -name '*.sh' -o -name '*.inc' -o -name 'Dockerfile*' | xargs -n1 python3 build/license.py --style hash
+	@find build/ kokoro/ src/ test/ vmlib/ -name '*.py' -o -name '*.sh' -o -name '*.inc' -o -name '*.gn' -o -name '*.gni' -o -name 'Dockerfile*' | xargs -n1 python3 build/license.py --style hash
 
 .PHONY: list
 list:
