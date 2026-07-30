@@ -95,8 +95,10 @@ void hftest_parse_ffa_manifest(struct hftest_context *ctx, struct fdt *fdt)
 	struct string mem_region_node_name = STRING_INIT("memory-regions");
 	struct string dev_region_node_name = STRING_INIT("device-regions");
 	struct memiter description;
+	struct uint32list_iter list;
 	uint64_t number;
 	uint16_t manifest_version_minor = 0xFFFF;
+	uint64_t j;
 
 	CHECK(ctx != NULL);
 	CHECK(fdt != NULL);
@@ -163,6 +165,47 @@ void hftest_parse_ffa_manifest(struct hftest_context *ctx, struct fdt *fdt)
 			EXPECT_TRUE(fdt_read_number(&ffa_node, "attributes",
 						    &number));
 			cur_region->attributes = (uint32_t)number;
+
+			if (fdt_read_number(&ffa_node, "smmu-id", &number)) {
+				cur_region->dma_prop.smmu_id = (uint32_t)number;
+			}
+
+			if (read_optional_uint32list(
+				    &ffa_node, "stream-ids-access-permissions",
+				    &list) == MANIFEST_SUCCESS) {
+				uint32_t permissions;
+				j = 0;
+				while (uint32list_has_next(&list)) {
+					uint32list_get_next(&list,
+							    &permissions);
+					if (j == 0) {
+						cur_region
+							->dma_access_permissions =
+							permissions;
+					}
+					EXPECT_EQ(
+						cur_region
+							->dma_access_permissions,
+						permissions);
+				}
+			}
+
+			if (read_optional_uint32list(&ffa_node, "stream-ids",
+						     &list) ==
+			    MANIFEST_SUCCESS) {
+				j = 0;
+				while (uint32list_has_next(&list)) {
+					EXPECT_LT(
+						j,
+						PARTITION_MAX_STREAMS_PER_DEVICE);
+					uint32list_get_next(
+						&list, &cur_region->dma_prop
+								.stream_ids[j]);
+					j++;
+				}
+				cur_region->dma_prop.stream_count = j;
+			}
+
 			mem_count++;
 		} while (fdt_next_sibling(&ffa_node));
 
