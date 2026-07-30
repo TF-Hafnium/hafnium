@@ -17,6 +17,7 @@ executable("unit_tests") {
     "manifest_v1_0_test.cc",
     "mm_test.cc",
     "mpool_test.cc",
+    "notifications_test.cc",
     "string_test.cc",
     "vcpu_test.cc",
     "vm_test.cc",
