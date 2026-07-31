@@ -728,4 +728,144 @@ TEST_F(vm, ffa_invocation_outstanding_vcpu_states)
 
 	vm_unlock(&test_vm_locked);
 }
+
+/**
+ * Verify that legacy GET retrieves IDs 0-63 without clearing extended
+ * notification IDs.
+ */
+TEST_F(vm, vm_notifications_legacy_get_preserves_extended_ids)
+{
+	struct vm_locked vm_locked = vm_lock(vm_find_index(0));
+	const bool is_from_vm = true;
+	ffa_notifications_bitmap_t legacy = ffa_notification_bitmap_single(5);
+	ffa_notifications_bitmap_t extended =
+		ffa_notification_bitmap_single(100);
+	ffa_notifications_bitmap_t pending =
+		ffa_notification_bitmap_or(legacy, extended);
+	ffa_notifications_bitmap_t empty_mask;
+	ffa_notifications_bitmap_t got;
+
+	ffa_notification_bitmap_init(&empty_mask);
+
+	/* Pend one legacy and one extended notification ID. */
+	vm_notifications_partition_set_pending(vm_locked, is_from_vm, pending);
+
+	/* Legacy GET must retrieve only ID 5 and preserve ID 100. */
+	got = vm_notifications_partition_get_pending(vm_locked, is_from_vm);
+	EXPECT_TRUE(ffa_notification_bitmap_equal(got, legacy));
+	EXPECT_FALSE(vm_is_notifications_pending_count_zero());
+
+	/* An unmasked GET2-style retrieval must still return ID 100. */
+	got = vm_notifications_partition_get_pending_masked(
+		vm_locked, is_from_vm, empty_mask);
+	EXPECT_TRUE(ffa_notification_bitmap_equal(got, extended));
+	EXPECT_TRUE(vm_is_notifications_pending_count_zero());
+
+	vm_unlock(&vm_locked);
+}
+
+/**
+ * Verify selective retrieval of partition notifications.
+ *
+ * Unmasked notifications are returned and cleared, while masked
+ * notifications remain pending for a later retrieval. Use notification IDs
+ * from multiple words of the extended bitmap.
+ */
+TEST_F(vm, vm_notifications_partition_get_pending_masked)
+{
+	struct vm_locked vm_locked = vm_lock(vm_find_index(0));
+	const bool is_from_vm = true;
+	ffa_notifications_bitmap_t pending;
+	ffa_notifications_bitmap_t expected;
+	ffa_notifications_bitmap_t empty_mask;
+	ffa_notifications_bitmap_t mask = ffa_notification_bitmap_single(64);
+	ffa_notifications_bitmap_t got;
+
+	ffa_notification_bitmap_init(&pending);
+	ffa_notification_bitmap_set(&pending, 20);
+	ffa_notification_bitmap_set(&pending, 64);
+	ffa_notification_bitmap_set(&pending, 383);
+
+	ffa_notification_bitmap_init(&expected);
+	ffa_notification_bitmap_set(&expected, 20);
+	ffa_notification_bitmap_set(&expected, 383);
+
+	ffa_notification_bitmap_init(&empty_mask);
+
+	/*
+	 * Set pending:            {20, 64, 383}
+	 * First GET, mask {64}:   returns {20, 383}
+	 * Remaining:              {64}
+	 * Second GET, empty mask: returns {64}
+	 * Remaining:              empty
+	 */
+	vm_notifications_partition_set_pending(vm_locked, is_from_vm, pending);
+
+	got = vm_notifications_partition_get_pending_masked(vm_locked,
+							    is_from_vm, mask);
+
+	EXPECT_TRUE(ffa_notification_bitmap_equal(got, expected));
+	EXPECT_FALSE(vm_is_notifications_pending_count_zero());
+
+	got = vm_notifications_partition_get_pending_masked(
+		vm_locked, is_from_vm, empty_mask);
+
+	EXPECT_TRUE(ffa_notification_bitmap_equal(got, mask));
+	EXPECT_TRUE(vm_is_notifications_pending_count_zero());
+
+	vm_unlock(&vm_locked);
+}
+
+/**
+ * Verify selective retrieval of framework notifications.
+ *
+ * Verify that retrieving one framework namespace does not clear the other,
+ * and that a masked notification remains pending for a later retrieval.
+ */
+TEST_F(vm, vm_notifications_framework_get_pending_masked)
+{
+	struct vm_locked vm_locked = vm_lock(vm_find_index(0));
+	const bool select_spm_framework = false;
+	const bool select_hyp_framework = true;
+	ffa_notifications_bitmap_t empty_mask;
+	ffa_notifications_bitmap_t rx_buffer_full =
+		ffa_notification_bitmap_single(
+			FFA_NOTIFICATION_RX_BUFFER_FULL_ID);
+	ffa_notifications_bitmap_t got;
+
+	ffa_notification_bitmap_init(&empty_mask);
+
+	/* Pend RX-buffer-full independently in both framework namespaces. */
+	vm_notifications_framework_set_rx_buffer_full(vm_locked,
+						      select_spm_framework);
+	vm_notifications_framework_set_rx_buffer_full(vm_locked,
+						      select_hyp_framework);
+
+	/*
+	 * Retrieve and clear SPMC bit 0. Hypervisor bit 0 must remain
+	 * pending.
+	 */
+	got = vm_notifications_framework_get_pending_masked(
+		vm_locked, select_spm_framework, empty_mask);
+
+	EXPECT_TRUE(ffa_notification_bitmap_equal(got, rx_buffer_full));
+	EXPECT_FALSE(vm_is_notifications_pending_count_zero());
+
+	/* Return nothing and retain Hypervisor bit 0 by masking it. */
+	got = vm_notifications_framework_get_pending_masked(
+		vm_locked, select_hyp_framework, rx_buffer_full);
+
+	EXPECT_TRUE(ffa_notification_bitmap_is_zero(got));
+	EXPECT_FALSE(vm_is_notifications_pending_count_zero());
+
+	/* Retrieve and clear the retained Hypervisor bit with an empty mask. */
+	got = vm_notifications_framework_get_pending_masked(
+		vm_locked, select_hyp_framework, empty_mask);
+
+	EXPECT_TRUE(ffa_notification_bitmap_equal(got, rx_buffer_full));
+	EXPECT_TRUE(vm_is_notifications_pending_count_zero());
+
+	vm_unlock(&vm_locked);
+}
+
 } /* namespace */
