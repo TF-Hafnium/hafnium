@@ -650,6 +650,24 @@ static inline struct ffa_value ffa_notification_args(
 	};
 }
 
+static inline struct ffa_value ffa_notification_args2(
+	uint32_t func, ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id,
+	uint64_t flags, ffa_notifications_bitmap_t bitmap)
+{
+	struct ffa_value args = {
+		.func = func,
+		.arg1 = ((uint64_t)sender_vm_id << 16) | receiver_vm_id,
+		.arg2 = flags,
+		.extended_val.valid = true,
+	};
+
+	ffa_notification_bitmap_to_regs(bitmap, &args.arg3, &args.arg4,
+					&args.arg5, &args.arg6, &args.arg7,
+					&args.extended_val.arg8);
+
+	return args;
+}
+
 static inline struct ffa_value ffa_notification_bind(
 	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id, uint32_t flags,
 	ffa_notifications_bitmap_t bitmap)
@@ -657,6 +675,15 @@ static inline struct ffa_value ffa_notification_bind(
 	return ffa_call(ffa_notification_args(FFA_NOTIFICATION_BIND_32,
 					      sender_vm_id, receiver_vm_id,
 					      flags, bitmap));
+}
+
+static inline struct ffa_value ffa_notification_bind2(
+	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id, uint64_t flags,
+	ffa_notifications_bitmap_t bitmap)
+{
+	return ffa_call_ext(ffa_notification_args2(FFA_NOTIFICATION_BIND2_64,
+						   sender_vm_id, receiver_vm_id,
+						   flags, bitmap));
 }
 
 static inline struct ffa_value ffa_notification_unbind(
@@ -668,6 +695,15 @@ static inline struct ffa_value ffa_notification_unbind(
 					      bitmap));
 }
 
+static inline struct ffa_value ffa_notification_unbind2(
+	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id,
+	ffa_notifications_bitmap_t bitmap)
+{
+	return ffa_call_ext(ffa_notification_args2(FFA_NOTIFICATION_UNBIND2_64,
+						   sender_vm_id, receiver_vm_id,
+						   0U, bitmap));
+}
+
 static inline struct ffa_value ffa_notification_set(
 	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id, uint32_t flags,
 	ffa_notifications_bitmap_t bitmap)
@@ -675,6 +711,15 @@ static inline struct ffa_value ffa_notification_set(
 	return ffa_call(ffa_notification_args(FFA_NOTIFICATION_SET_32,
 					      sender_vm_id, receiver_vm_id,
 					      flags, bitmap));
+}
+
+static inline struct ffa_value ffa_notification_set2(
+	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id, uint64_t flags,
+	ffa_notifications_bitmap_t bitmap)
+{
+	return ffa_call_ext(ffa_notification_args2(FFA_NOTIFICATION_SET2_64,
+						   sender_vm_id, receiver_vm_id,
+						   flags, bitmap));
 }
 
 static inline struct ffa_value ffa_notification_get(ffa_id_t receiver_vm_id,
@@ -686,6 +731,33 @@ static inline struct ffa_value ffa_notification_get(ffa_id_t receiver_vm_id,
 		.arg1 = ((uint64_t)vcpu_id << 16) | (receiver_vm_id),
 		.arg2 = flags,
 	});
+}
+
+static inline struct ffa_value ffa_notification_get2(
+	ffa_id_t receiver_vm_id, ffa_vcpu_index_t vcpu_id, uint64_t flags,
+	ffa_notifications_bitmap_t sp_mask, ffa_notifications_bitmap_t vm_mask,
+	uint64_t spm_mask, uint64_t hyp_mask)
+{
+	struct ffa_value args = {
+		.func = FFA_NOTIFICATION_GET2_64,
+		.arg1 = ((uint64_t)vcpu_id << 16) | receiver_vm_id,
+		.arg2 = flags,
+		.extended_val.arg15 = spm_mask,
+		.extended_val.arg16 = hyp_mask,
+		.extended_val.arg17 = 0U,
+		.extended_val.valid = true,
+	};
+
+	ffa_notification_bitmap_to_regs(sp_mask, &args.arg3, &args.arg4,
+					&args.arg5, &args.arg6, &args.arg7,
+					&args.extended_val.arg8);
+
+	ffa_notification_bitmap_to_regs(
+		vm_mask, &args.extended_val.arg9, &args.extended_val.arg10,
+		&args.extended_val.arg11, &args.extended_val.arg12,
+		&args.extended_val.arg13, &args.extended_val.arg14);
+
+	return ffa_call_ext(args);
 }
 
 static inline struct ffa_value ffa_notification_info_get(void)
