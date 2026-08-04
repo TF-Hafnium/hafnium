@@ -92,7 +92,8 @@ static void check_partition_info_descriptors(
 	EXPECT_EQ(partitions[4].properties,
 		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
 			  FFA_PARTITION_DIRECT_REQ_RECV |
-			  FFA_PARTITION_INDIRECT_MSG);
+			  FFA_PARTITION_INDIRECT_MSG |
+			  FFA_PARTITION_DIRECT_REQ2_RECV);
 }
 
 TEST(partition_info_v1_3, ffa_partition_info_get_null_uuid)

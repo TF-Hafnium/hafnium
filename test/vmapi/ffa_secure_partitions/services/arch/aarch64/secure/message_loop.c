@@ -180,10 +180,33 @@ static struct ffa_value handle_direct_req2_cmd(struct ffa_value res)
 
 	hftest_set_dir_req_source_id(ffa_sender(res));
 
-	if (res.arg4 == SP_SLEEP_CMD) {
+	switch ((enum sp_cmd)res.arg4) {
+	case SP_SLEEP_CMD:
 		res = sp_sleep_cmd(ffa_sender(res), res.arg5, options,
 				   FFA_MSG_SEND_DIRECT_REQ2_64);
-	} else {
+		break;
+	case SP_NOTIF_SET2_CMD:
+		res = sp_notif_set2_cmd(
+			ffa_sender(res), sp_notif2_endpoint(res),
+			sp_notif2_flags(res), sp_notif2_bitmap(res));
+		break;
+	case SP_NOTIF_GET2_CMD:
+		res = sp_notif_get2_cmd(
+			ffa_sender(res),
+			(ffa_vcpu_index_t)sp_notif2_endpoint(res),
+			sp_notif2_flags(res), sp_notif2_bitmap(res));
+		break;
+	case SP_NOTIF_BIND2_CMD:
+		res = sp_notif_bind2_cmd(
+			ffa_sender(res), sp_notif2_endpoint(res),
+			sp_notif2_flags(res), sp_notif2_bitmap(res));
+		break;
+	case SP_NOTIF_UNBIND2_CMD:
+		res = sp_notif_unbind2_cmd(ffa_sender(res),
+					   sp_notif2_endpoint(res),
+					   sp_notif2_bitmap(res));
+		break;
+	default:
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT
 			   "0x%lx is not a valid command from %x\n",

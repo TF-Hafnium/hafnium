@@ -70,7 +70,8 @@ static void check_v1_1_partition_info_descriptors(
 	EXPECT_EQ(partitions[3].properties,
 		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
 			  FFA_PARTITION_DIRECT_REQ_RECV |
-			  FFA_PARTITION_INDIRECT_MSG);
+			  FFA_PARTITION_INDIRECT_MSG |
+			  FFA_PARTITION_DIRECT_REQ2_RECV);
 }
 
 TEST(ffa, ffa_partition_info_get_regs_sp_test)

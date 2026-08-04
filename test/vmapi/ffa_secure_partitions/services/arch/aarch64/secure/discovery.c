@@ -87,7 +87,9 @@ static void sp_check_partition_info_get_regs_null_uuid(void)
 		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
 			  FFA_PARTITION_INDIRECT_MSG |
 			  FFA_PARTITION_DIRECT_REQ_RECV |
-			  FFA_PARTITION_DIRECT_REQ_SEND);
+			  FFA_PARTITION_DIRECT_REQ_SEND |
+			  FFA_PARTITION_DIRECT_REQ2_RECV |
+			  FFA_PARTITION_DIRECT_REQ2_SEND);
 }
 
 static void sp_check_partition_info_get_regs_uuid(void)

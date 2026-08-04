@@ -61,6 +61,14 @@ static inline uint32_t sp_resp_value2(struct ffa_value res)
 	return res.arg5;
 }
 
+/**
+ * Return the service status carried in x4 by a direct response2 message.
+ */
+static inline int sp_resp2(struct ffa_value res)
+{
+	return (int)res.arg4;
+}
+
 ffa_id_t sp_find_next_endpoint(ffa_id_t self_id);
 
 enum sp_cmd {
@@ -284,6 +292,15 @@ enum sp_cmd {
 	 * it.
 	 */
 	SP_RELINQUISH_SHARED_BUFFER_CMD,
+
+	/**
+	 * Commands to request an SP to invoke the extended notification
+	 * interfaces.
+	 */
+	SP_NOTIF_SET2_CMD,
+	SP_NOTIF_GET2_CMD,
+	SP_NOTIF_BIND2_CMD,
+	SP_NOTIF_UNBIND2_CMD,
 };
 
 /**
@@ -492,6 +509,144 @@ static inline struct ffa_value sp_notif_unbind_cmd_send(
 struct ffa_value sp_notif_unbind_cmd(ffa_id_t test_source,
 				     ffa_id_t notif_sender,
 				     ffa_notifications_bitmap_t bitmap);
+
+/**
+ * Build and send a direct request2 command for an extended notification
+ * operation.
+ *
+ * The direct request2 registers are encoded as follows:
+ * x1[31:16]: sender endpoint ID, x1[15:0]: receiver endpoint ID,
+ * x2-x3: receiver UUID,
+ * x4: command
+ * x5: notification endpoint or vCPU ID
+ * x6: flags
+ * x7-x12: 384-bit notification bitmap or GET2 mask.
+ */
+static inline struct ffa_value sp_notif2_cmd_send(
+	ffa_id_t sender, ffa_id_t receiver,
+	const struct ffa_uuid *receiver_uuid, enum sp_cmd cmd,
+	ffa_id_t endpoint_id, uint64_t flags, ffa_notifications_bitmap_t bitmap)
+{
+	uint64_t msg[9] = {cmd, endpoint_id, flags};
+
+	ffa_notification_bitmap_to_regs(bitmap, &msg[3], &msg[4], &msg[5],
+					&msg[6], &msg[7], &msg[8]);
+
+	return ffa_msg_send_direct_req2(sender, receiver, receiver_uuid, msg,
+					sizeof(msg) / sizeof(msg[0]));
+}
+
+/**
+ * Request an SP to invoke FFA_NOTIFICATION_SET2 for notif_receiver.
+ */
+static inline struct ffa_value sp_notif_set2_cmd_send(
+	ffa_id_t sender, ffa_id_t receiver,
+	const struct ffa_uuid *receiver_uuid, ffa_id_t notif_receiver,
+	uint64_t flags, ffa_notifications_bitmap_t bitmap)
+{
+	return sp_notif2_cmd_send(sender, receiver, receiver_uuid,
+				  SP_NOTIF_SET2_CMD, notif_receiver, flags,
+				  bitmap);
+}
+
+/**
+ * Request an SP to invoke FFA_NOTIFICATION_GET2.
+ *
+ * The service accepts one partition-notification mask. flags selects whether
+ * it is the SP mask or VM mask.
+ */
+static inline struct ffa_value sp_notif_get2_cmd_send(
+	ffa_id_t sender, ffa_id_t receiver,
+	const struct ffa_uuid *receiver_uuid, ffa_vcpu_index_t vcpu_id,
+	uint64_t flags, ffa_notifications_bitmap_t mask)
+{
+	return sp_notif2_cmd_send(sender, receiver, receiver_uuid,
+				  SP_NOTIF_GET2_CMD, vcpu_id, flags, mask);
+}
+
+/**
+ * Request an SP to invoke FFA_NOTIFICATION_BIND2 for notif_sender.
+ */
+static inline struct ffa_value sp_notif_bind2_cmd_send(
+	ffa_id_t sender, ffa_id_t receiver,
+	const struct ffa_uuid *receiver_uuid, ffa_id_t notif_sender,
+	uint64_t flags, ffa_notifications_bitmap_t bitmap)
+{
+	return sp_notif2_cmd_send(sender, receiver, receiver_uuid,
+				  SP_NOTIF_BIND2_CMD, notif_sender, flags,
+				  bitmap);
+}
+
+/**
+ * Request an SP to invoke FFA_NOTIFICATION_UNBIND2 for notif_sender.
+ */
+static inline struct ffa_value sp_notif_unbind2_cmd_send(
+	ffa_id_t sender, ffa_id_t receiver,
+	const struct ffa_uuid *receiver_uuid, ffa_id_t notif_sender,
+	ffa_notifications_bitmap_t bitmap)
+{
+	return sp_notif2_cmd_send(sender, receiver, receiver_uuid,
+				  SP_NOTIF_UNBIND2_CMD, notif_sender, 0U,
+				  bitmap);
+}
+
+/**
+ * Extract the notification endpoint or vCPU ID from x5 of a notification2
+ * service command.
+ */
+static inline ffa_id_t sp_notif2_endpoint(struct ffa_value cmd)
+{
+	return (ffa_id_t)cmd.arg5;
+}
+
+/**
+ * Extract the notification flags from x6 of a notification2 service command.
+ */
+static inline uint64_t sp_notif2_flags(struct ffa_value cmd)
+{
+	return cmd.arg6;
+}
+
+/**
+ * Reconstruct the 384-bit bitmap or GET2 mask carried in x7-x12 of a
+ * notification2 service command.
+ */
+static inline ffa_notifications_bitmap_t sp_notif2_bitmap(struct ffa_value cmd)
+{
+	return ffa_notification_bitmap_from_regs(
+		cmd.arg7, cmd.extended_val.arg8, cmd.extended_val.arg9,
+		cmd.extended_val.arg10, cmd.extended_val.arg11,
+		cmd.extended_val.arg12);
+}
+
+/**
+ * Reconstruct the single partition-notification bitmap returned in x5-x10.
+ * The response status occupies x4.
+ */
+static inline ffa_notifications_bitmap_t sp_notif_get2_bitmap(
+	struct ffa_value res)
+{
+	return ffa_notification_bitmap_from_regs(
+		res.arg5, res.arg6, res.arg7, res.extended_val.arg8,
+		res.extended_val.arg9, res.extended_val.arg10);
+}
+
+/* SP-side handlers for the extended notification service commands. */
+struct ffa_value sp_notif_set2_cmd(ffa_id_t test_source,
+				   ffa_id_t notif_receiver, uint64_t flags,
+				   ffa_notifications_bitmap_t bitmap);
+
+struct ffa_value sp_notif_get2_cmd(ffa_id_t test_source,
+				   ffa_vcpu_index_t vcpu_id, uint64_t flags,
+				   ffa_notifications_bitmap_t mask);
+
+struct ffa_value sp_notif_bind2_cmd(ffa_id_t test_source, ffa_id_t notif_sender,
+				    uint64_t flags,
+				    ffa_notifications_bitmap_t bitmap);
+
+struct ffa_value sp_notif_unbind2_cmd(ffa_id_t test_source,
+				      ffa_id_t notif_sender,
+				      ffa_notifications_bitmap_t bitmap);
 
 struct ffa_value sp_check_ffa_return_resp(ffa_id_t test_source, ffa_id_t own_id,
 					  struct ffa_value res);

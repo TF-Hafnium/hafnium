@@ -36,7 +36,11 @@
 
 		service0 {
 			uuid = "1df938ef-e8b9-4490-8496-7204ab77f4a5";
-			messaging-method = <0x7>; /* Supports direct and indirect requests. */
+			/*
+			 * Supports indirect, direct and direct
+			 * request2/response2 messaging.
+			 */
+			messaging-method = <0x607>;
 		};
 	};
 
