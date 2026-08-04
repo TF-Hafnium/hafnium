@@ -266,4 +266,69 @@ TEST(ffa_mixed_mailbox, oversized_retrieve_response_large_mailbox)
 	EXPECT_EQ(sp_resp_value2(ret), total_length);
 }
 
+/*
+ * `vm_primary` in this suite is a Normal-World VM running under a separate
+ * Hafnium-as-Hypervisor instance (see BUILD.gn /
+ * partition_manifest_nwd_primary.dts), not a Secure Partition inside this SPMC.
+ * So a LEND from `vm_primary` to an SP always crosses the hypervisor<->SPMC
+ * boundary: the Hypervisor's own `api_ffa_mem_send()` sees the SP receiver as
+ * belonging to "the other world" and forwards the fragment via a real SMC
+ * (`memory_send_other_world_forward()`), a channel hard-fixed at exactly
+ * one FF-A page independent of RXTX_MAX_PAGE_COUNT. That forwarding limit
+ * is intentionally NOT relaxed by the send-side fragment cap change (see
+ * `ffa_memory_other_world_send()` in `src/ffa/hypervisor/ffa_memory.c`), so
+ * a >4 KiB single fragment must still be rejected here regardless of how
+ * large the receiver's own mailbox is. (The relaxation instead applies to
+ * the same-world path taken when the sender and receiver are both within
+ * one SPMC instance, e.g. SP-to-SP, which this suite's `vm_primary` cannot
+ * exercise.)
+ */
+TEST(ffa_mixed_mailbox, oversized_single_fragment_lend_other_world_rejected)
+{
+	struct ffa_value ret;
+	ffa_id_t sender_id = hf_vm_get_id();
+	static struct ffa_memory_region_constituent
+		constituents[OVERSIZED_CONSTITUENT_COUNT];
+	struct ffa_memory_access receiver_v1_2;
+	struct ffa_memory_access_impdef impdef =
+		ffa_memory_access_impdef_init(LARGE_SP_ID, LARGE_SP_ID + 1);
+	uint32_t total_length;
+	uint32_t fragment_length;
+	uint32_t remaining_constituent_count;
+	struct mailbox_buffers mb =
+		set_up_mailbox_pages(FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT);
+
+	set_up_heterogeneous_mailboxes();
+
+	for (uint32_t i = 0; i < OVERSIZED_CONSTITUENT_COUNT; i++) {
+		constituents[i].address = (uint64_t)pages + i * PAGE_SIZE;
+		constituents[i].page_count = 1;
+	}
+
+	ffa_memory_access_init(&receiver_v1_2, LARGE_SP_ID, FFA_DATA_ACCESS_RW,
+			       FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+			       &impdef);
+
+	/*
+	 * Give the whole multi-page mailbox to `ffa_memory_region_init()` so
+	 * the entire descriptor, including all constituents, fits in one
+	 * fragment that is bigger than one FF-A page.
+	 */
+	remaining_constituent_count = ffa_memory_region_init(
+		mb.send, mb.buf_size, sender_id, &receiver_v1_2, 1,
+		sizeof(struct ffa_memory_access), constituents,
+		ARRAY_SIZE(constituents), 0, 0, FFA_MEMORY_NOT_SPECIFIED_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE,
+		&total_length, &fragment_length);
+
+	/* The whole region must fit in the single fragment. */
+	ASSERT_EQ(remaining_constituent_count, 0);
+	ASSERT_EQ(total_length, fragment_length);
+	ASSERT_GT(fragment_length, FFA_PAGE_SIZE);
+
+	ret = ffa_mem_lend(total_length, fragment_length);
+	EXPECT_EQ(ret.func, FFA_ERROR_32);
+	EXPECT_EQ(ffa_error_code(ret), FFA_INVALID_PARAMETERS);
+}
+
 #endif /* RXTX_MAX_PAGE_COUNT > 1 */
