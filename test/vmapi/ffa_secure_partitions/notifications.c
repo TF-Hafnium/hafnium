@@ -27,6 +27,28 @@ struct notif_cpu_entry_args {
 	bool is_sp_up;
 };
 
+/*
+ * Use notification IDs from the first, second and final 64-bit words to
+ * verify that the complete 384-bit bitmap is transported end to end.
+ */
+static ffa_notifications_bitmap_t notification2_test_bitmap(void)
+{
+	ffa_notifications_bitmap_t bitmap;
+
+	ffa_notification_bitmap_init(&bitmap);
+	ffa_notification_bitmap_set(&bitmap, 20);
+	ffa_notification_bitmap_set(&bitmap, 64);
+	ffa_notification_bitmap_set(&bitmap, 383);
+
+	return bitmap;
+}
+
+SET_UP(ffa_notifications2)
+{
+	ASSERT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
+}
+
 static void notif_signal_vm_to_sp(ffa_id_t sender, ffa_id_t receiver,
 				  ffa_notifications_bitmap_t bitmap,
 				  uint32_t flags)
@@ -94,6 +116,148 @@ static void notif_signal_sp_to_vm(ffa_id_t sender, ffa_id_t receiver,
 
 	res = ffa_notification_unbind(sender, receiver, bitmap);
 	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+}
+
+static void notif2_signal_sp_to_vm(ffa_id_t sender, ffa_id_t receiver,
+				   const struct ffa_uuid *sender_uuid,
+				   ffa_notifications_bitmap_t bitmap,
+				   uint64_t flags)
+{
+	struct ffa_value res;
+	ffa_notifications_bitmap_t empty;
+	ffa_vcpu_index_t vcpu_id = (ffa_vcpu_index_t)(flags >> 16U) & 0xFFFFU;
+
+	ffa_notification_bitmap_init(&empty);
+
+	/* Bind notifications from the sender SP to the receiver VM. */
+	res = ffa_notification_bind2(sender, receiver, 0U, bitmap);
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+
+	/* Request the sender SP to set notifications. */
+	res = sp_notif_set2_cmd_send(receiver, sender, sender_uuid, receiver,
+				     flags, bitmap);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+	EXPECT_EQ(sp_resp2(res), SP_SUCCESS);
+
+	/* Retrieve FF-A endpoints with pending notifications. */
+	res = ffa_notification_info_get();
+	EXPECT_EQ(res.func, FFA_SUCCESS_64);
+
+	/* Retrieve the notifications sent by the SP. */
+	res = ffa_notification_get2(receiver, vcpu_id,
+				    FFA_NOTIFICATION_FLAG_BITMAP_SP, empty,
+				    empty, 0U, 0U);
+	EXPECT_EQ(res.func, FFA_SUCCESS_64);
+	EXPECT_TRUE(ffa_notification_bitmap_equal(
+		ffa_notification_bitmap_from_get2_sp(res), bitmap));
+	EXPECT_TRUE(ffa_notification_bitmap_is_zero(
+		ffa_notification_bitmap_from_get2_vm(res)));
+
+	res = ffa_notification_unbind2(sender, receiver, bitmap);
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+}
+
+static void notif2_signal_vm_to_sp(ffa_id_t sender, ffa_id_t receiver,
+				   const struct ffa_uuid *receiver_uuid,
+				   ffa_notifications_bitmap_t bitmap,
+				   uint64_t flags,
+				   ffa_notifications_bitmap_t mask)
+{
+	struct ffa_value res;
+	ffa_vcpu_index_t vcpu_id = (flags >> 16U) & 0xFFFFU;
+	ffa_notifications_bitmap_t empty;
+	ffa_notifications_bitmap_t expected;
+	ffa_notifications_bitmap_t remaining;
+
+	ffa_notification_bitmap_init(&empty);
+
+	/* Notifications returned by the first masked GET2. */
+	expected = ffa_notification_bitmap_exclude(bitmap, mask);
+
+	/* Masked notifications retained for the second GET2. */
+	remaining = ffa_notification_bitmap_and(bitmap, mask);
+
+	/* Request the receiver SP to bind notifications. */
+	res = sp_notif_bind2_cmd_send(sender, receiver, receiver_uuid, sender,
+				      0U, bitmap);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+	EXPECT_EQ(sp_resp2(res), SP_SUCCESS);
+
+	res = ffa_notification_set2(sender, receiver, flags, bitmap);
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+
+	res = ffa_notification_info_get();
+	EXPECT_EQ(res.func, FFA_SUCCESS_64);
+
+	/*
+	 * Masked notifications must remain pending while all other selected
+	 * notifications are retrieved.
+	 */
+	res = sp_notif_get2_cmd_send(sender, receiver, receiver_uuid, vcpu_id,
+				     FFA_NOTIFICATION_FLAG_BITMAP_VM, mask);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+	EXPECT_EQ(sp_resp2(res), SP_SUCCESS);
+	EXPECT_TRUE(ffa_notification_bitmap_equal(sp_notif_get2_bitmap(res),
+						  expected));
+
+	/* Retrieve the notifications which were masked by the first GET2. */
+	res = sp_notif_get2_cmd_send(sender, receiver, receiver_uuid, vcpu_id,
+				     FFA_NOTIFICATION_FLAG_BITMAP_VM, empty);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+	EXPECT_EQ(sp_resp2(res), SP_SUCCESS);
+	EXPECT_TRUE(ffa_notification_bitmap_equal(sp_notif_get2_bitmap(res),
+						  remaining));
+
+	/* Request the receiver SP to unbind notifications. */
+	res = sp_notif_unbind2_cmd_send(sender, receiver, receiver_uuid, sender,
+					bitmap);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+	EXPECT_EQ(sp_resp2(res), SP_SUCCESS);
+}
+
+static void notif2_signal_sp_to_sp(ffa_id_t sender, ffa_id_t receiver,
+				   const struct ffa_uuid *sender_uuid,
+				   const struct ffa_uuid *receiver_uuid,
+				   ffa_notifications_bitmap_t bitmap,
+				   uint64_t flags)
+{
+	ffa_id_t test_source = hf_vm_get_id();
+	ffa_vcpu_index_t vcpu_id = (ffa_vcpu_index_t)(flags >> 16U) & 0xFFFFU;
+	ffa_notifications_bitmap_t empty;
+	struct ffa_value res;
+
+	ffa_notification_bitmap_init(&empty);
+
+	/* Request the receiver SP to bind notifications from the sender SP. */
+	res = sp_notif_bind2_cmd_send(test_source, receiver, receiver_uuid,
+				      sender, 0U, bitmap);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+	EXPECT_EQ(sp_resp2(res), SP_SUCCESS);
+
+	/* Request the sender SP to set notifications for the receiver SP. */
+	res = sp_notif_set2_cmd_send(test_source, sender, sender_uuid, receiver,
+				     flags, bitmap);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+	EXPECT_EQ(sp_resp2(res), SP_SUCCESS);
+
+	/* Retrieve FF-A endpoints with pending notifications. */
+	res = ffa_notification_info_get();
+	EXPECT_EQ(res.func, FFA_SUCCESS_64);
+
+	/* Request the receiver SP to retrieve notifications from an SP. */
+	res = sp_notif_get2_cmd_send(test_source, receiver, receiver_uuid,
+				     vcpu_id, FFA_NOTIFICATION_FLAG_BITMAP_SP,
+				     empty);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+	EXPECT_EQ(sp_resp2(res), SP_SUCCESS);
+	EXPECT_TRUE(ffa_notification_bitmap_equal(sp_notif_get2_bitmap(res),
+						  bitmap));
+
+	/* Request the receiver SP to unbind notifications from the sender SP */
+	res = sp_notif_unbind2_cmd_send(test_source, receiver, receiver_uuid,
+					sender, bitmap);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+	EXPECT_EQ(sp_resp2(res), SP_SUCCESS);
 }
 
 /**
@@ -217,4 +381,65 @@ TEST(ffa_notifications, fail_if_mbz_set_in_notifications_bind)
 				    ~FFA_NOTIFICATION_FLAG_PER_VCPU,
 				    ffa_notification_bitmap_single(1));
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * Test to validate Notification2 signaling from an SP to a VM.
+ */
+TEST(ffa_notifications2, signaling_from_sp_to_vm)
+{
+	const struct ffa_uuid sender_uuid = SERVICE2;
+
+	/*
+	 * Receiver VM: BIND2
+	 * Sender SP:   SET2 through a service command
+	 * Receiver VM: GET2 returns {20, 64, 383} from the SP bitmap
+	 * Receiver VM: UNBIND2
+	 */
+	/* Direct request2 requires both endpoints to support FF-A v1.2 or
+	 * later. */
+	notif2_signal_sp_to_vm(SP_ID(2), hf_vm_get_id(), &sender_uuid,
+			       notification2_test_bitmap(),
+			       FFA_NOTIFICATIONS_FLAG_DELAY_SRI);
+}
+
+/**
+ * Test to validate Notification2 signaling from a VM to an SP.
+ */
+TEST(ffa_notifications2, signaling_from_vm_to_sp)
+{
+	const struct ffa_uuid receiver_uuid = SERVICE2;
+	/*
+	 * Receiver SP: BIND2
+	 * Sender VM:   SET2
+	 * Receiver SP: GET2 with mask {64} returns {20, 383}
+	 * Receiver SP: GET2 with an empty mask returns {64}
+	 * Receiver SP: UNBIND2
+	 */
+	notif2_signal_vm_to_sp(hf_vm_get_id(), SP_ID(2), &receiver_uuid,
+			       notification2_test_bitmap(), 0U,
+			       ffa_notification_bitmap_single(64));
+}
+
+/**
+ * Test to validate Notification2 signaling from an SP to another SP.
+ * The primary VM controls the test while the two SPs perform the notification
+ * operations.
+ */
+TEST(ffa_notifications2, signaling_from_sp_to_sp)
+{
+	const struct ffa_uuid sender_uuid = SERVICE3;
+	const struct ffa_uuid receiver_uuid = SERVICE2;
+
+	/*
+	 * Receiver SP2: BIND2 through a service command
+	 * Sender SP3:   SET2 through a service command
+	 * Receiver SP2: GET2 returns {20, 64, 383} from the SP bitmap
+	 * Receiver SP2: UNBIND2 through a service command
+	 *
+	 * The primary VM controls both SPs.
+	 */
+
+	notif2_signal_sp_to_sp(SP_ID(3), SP_ID(2), &sender_uuid, &receiver_uuid,
+			       notification2_test_bitmap(), 0U);
 }
