@@ -443,3 +443,50 @@ TEST(ffa_notifications2, signaling_from_sp_to_sp)
 	notif2_signal_sp_to_sp(SP_ID(3), SP_ID(2), &sender_uuid, &receiver_uuid,
 			       notification2_test_bitmap(), 0U);
 }
+
+/**
+ * Validate notification-count discovery at the Non-secure virtual FF-A
+ * interface.
+ *
+ * The primary VM queries the hypervisor. Both count fields encode 320
+ * additional notification IDs, corresponding to 384 supported IDs.
+ */
+TEST(ffa_features, notification_counts_at_ns_virtual_interface)
+{
+	/* FF-A encodes the count above the legacy base: 384 - 64 = 320. */
+	const uint32_t expected_encoded_count =
+		MAX_FFA_NOTIFICATIONS - FFA_NOTIFICATION_COUNT_BASE;
+
+	/* Mask covering the VM and SP count fields, bits[19:2]. */
+	const uint32_t count_fields = (FFA_NOTIFICATION_COUNT_MASK
+				       << FFA_NOTIFICATION_COUNT_VM_SHIFT) |
+				      (FFA_NOTIFICATION_COUNT_MASK
+				       << FFA_NOTIFICATION_COUNT_SP_SHIFT);
+
+	/* Mask covering every defined notification-feature field, bits[19:0] */
+	const uint32_t supported_fields = FFA_NOTIFY_FEAT_NO_PER_VCPU_VM |
+					  FFA_NOTIFY_FEAT_NO_PER_VCPU_SP |
+					  count_fields;
+	struct ffa_value ret;
+	uint32_t features;
+	uint32_t vm_count;
+	uint32_t sp_count;
+
+	ret = ffa_features(FFA_FEATURE_NOTIFICATION);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	features = (uint32_t)ret.arg2;
+	EXPECT_TRUE((features & FFA_NOTIFY_FEAT_NO_PER_VCPU_VM) != 0U);
+	EXPECT_TRUE((features & FFA_NOTIFY_FEAT_NO_PER_VCPU_SP) != 0U);
+
+	vm_count = (features >> FFA_NOTIFICATION_COUNT_VM_SHIFT) &
+		   FFA_NOTIFICATION_COUNT_MASK;
+	sp_count = (features >> FFA_NOTIFICATION_COUNT_SP_SHIFT) &
+		   FFA_NOTIFICATION_COUNT_MASK;
+
+	EXPECT_EQ(vm_count, expected_encoded_count);
+	EXPECT_EQ(sp_count, expected_encoded_count);
+
+	/* All bits outside the defined feature fields must remain zero. */
+	EXPECT_EQ(features & ~supported_fields, 0U);
+}

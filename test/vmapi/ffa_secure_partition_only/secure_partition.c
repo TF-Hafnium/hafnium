@@ -156,9 +156,6 @@ TEST(ffa_features, succeeds_ffa_call_ids)
 	/* Only supported by the primary scheduler. */
 	ret = ffa_features(FFA_NOTIFICATION_INFO_GET_64);
 	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
-
-	ret = ffa_features(FFA_ABORT_32);
-	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 }
 
 static bool v1_1_or_later(void)
@@ -169,6 +166,11 @@ static bool v1_1_or_later(void)
 static bool v1_2_or_later(void)
 {
 	return FFA_VERSION_COMPILED >= FFA_VERSION_1_2;
+}
+
+static bool v1_3_or_later(void)
+{
+	return FFA_VERSION_COMPILED >= FFA_VERSION_1_3;
 }
 
 TEST_PRECONDITION(ffa_features, succeeds_ffa_call_ids_v1_1, v1_1_or_later)
@@ -228,9 +230,50 @@ TEST_PRECONDITION(ffa_features, succeeds_ffa_call_ids_v1_2, v1_2_or_later)
 		  FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT);
 }
 
-/** Validates return for FFA_FEATURES provided a valid feature ID. */
-TEST(ffa_features, succeeds_feature_ids)
+TEST_PRECONDITION(ffa_features, succeeds_ffa_call_ids_v1_3, v1_3_or_later)
 {
+	struct ffa_value ret;
+
+	ret = ffa_features(FFA_ABORT_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_NOTIFICATION_BIND2_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_NOTIFICATION_UNBIND2_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_NOTIFICATION_SET2_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_NOTIFICATION_GET2_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+}
+
+/**
+ * Validates FFA_FEATURES for valid feature IDs at the secure virtual
+ * interface.
+ */
+TEST(ffa_features, validates_feature_ids_and_notification_fields)
+{
+	/* FF-A encodes the implemented count above legacy base: 384 - 64. */
+	const uint32_t expected_encoded_count =
+		MAX_FFA_NOTIFICATIONS - FFA_NOTIFICATION_COUNT_BASE; /* 320 */
+
+	/* Mask covering the VM and SP count fields, bits[19:2]. */
+	const uint32_t count_fields =
+		(FFA_NOTIFICATION_COUNT_MASK
+		 << FFA_NOTIFICATION_COUNT_VM_SHIFT) |
+		(FFA_NOTIFICATION_COUNT_MASK
+		 << FFA_NOTIFICATION_COUNT_SP_SHIFT); /* 0x000ffffc. */
+
+	/* Mask covering every defined notification-feature field, bits[19:0] */
+	const uint32_t supported_fields = FFA_NOTIFY_FEAT_NO_PER_VCPU_VM |
+					  FFA_NOTIFY_FEAT_NO_PER_VCPU_SP |
+					  count_fields; /* 0x000fffff. */
+	uint32_t features;
+	uint32_t vm_count;
+	uint32_t sp_count;
 	struct ffa_value ret = ffa_features(FFA_FEATURE_NPI);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 	EXPECT_EQ(ffa_feature_intid(ret), HF_NOTIFICATION_PENDING_INTID);
@@ -244,18 +287,27 @@ TEST(ffa_features, succeeds_feature_ids)
 
 	ret = ffa_features(FFA_FEATURE_NOTIFICATION);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
 	/**
 	 * The return value should have:
-	 * bit[0]=1 (VM per-vCPU unsupported),
-	 * bit[1]=1 (SP per-vCPU unsupported), and the rest 0
+	 * bit[0] = 1: VM per-vCPU notifications are unsupported;
+	 * bit[1] = 1: SP per-vCPU notifications are unsupported;
+	 * bits[10:2]: implemented VM notification count above the base 64;
+	 * bits[19:11]: implemented SP notification count above the base 64.
 	 */
-	uint32_t features = (uint32_t)ret.arg2;
-	EXPECT_TRUE((features & FFA_NOTIFY_FEAT_NO_PER_VCPU_VM) != 0);
-	EXPECT_TRUE((features & FFA_NOTIFY_FEAT_NO_PER_VCPU_SP) != 0);
-	/* All other bits 0 */
-	EXPECT_EQ(features & ~(FFA_NOTIFY_FEAT_NO_PER_VCPU_VM |
-			       FFA_NOTIFY_FEAT_NO_PER_VCPU_SP),
-		  0U);
+	features = (uint32_t)ret.arg2;
+	EXPECT_TRUE((features & FFA_NOTIFY_FEAT_NO_PER_VCPU_VM) != 0U);
+	EXPECT_TRUE((features & FFA_NOTIFY_FEAT_NO_PER_VCPU_SP) != 0U);
+	vm_count = (features >> FFA_NOTIFICATION_COUNT_VM_SHIFT) &
+		   FFA_NOTIFICATION_COUNT_MASK;
+	sp_count = (features >> FFA_NOTIFICATION_COUNT_SP_SHIFT) &
+		   FFA_NOTIFICATION_COUNT_MASK;
+
+	EXPECT_EQ(vm_count, expected_encoded_count);
+	EXPECT_EQ(sp_count, expected_encoded_count);
+
+	/* All bits outside the defined feature fields must remain zero */
+	EXPECT_EQ(features & ~supported_fields, 0U);
 }
 
 /** Validates error return for FFA_FEATURES provided a wrongful feature ID. */
@@ -505,7 +557,7 @@ TEST(ffa_boot_info, parse_fdt)
 	EXPECT_TRUE(fdt_is_compatible(&root, "arm,ffa-manifest-1.1"));
 	EXPECT_TRUE(fdt_read_number(&root, "ffa-version", &ffa_version));
 	HFTEST_LOG("FF-A Version: %lx", ffa_version);
-	ASSERT_EQ(ffa_version, FFA_VERSION_1_2);
+	ASSERT_EQ(ffa_version, FFA_VERSION_1_3);
 }
 
 /*
@@ -1242,7 +1294,7 @@ TEST(ffa_version, compat_check)
 
 TEST(ffa_version, compat_check_succeeds_when_framework_in_use_rxtx_buffer)
 {
-	const enum ffa_version initial_version = FFA_VERSION_1_2;
+	const enum ffa_version initial_version = FFA_VERSION_1_3;
 	const enum ffa_version null_version = make_ffa_version(0, 0);
 
 	EXPECT_EQ(ffa_version(0, VERSION_QUERY_GET_NEGOTIATED),
