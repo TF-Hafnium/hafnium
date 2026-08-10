@@ -37,11 +37,18 @@
  * The small-mailbox SP and the large-mailbox SP. SP First is pinned to FF-A
  * v1.0 by its manifest; used as the sender for
  * `oversized_single_fragment_lend_v1_0_rejected` below, exercising the
- * v1.0-specific one-page cap in `api_ffa_mem_send()`. SP First's `mem_size`
- * is bumped for the owned-memory headroom `sp_ffa_mem_lend_cmd()` needs.
+ * v1.0-specific one-page cap in `api_ffa_mem_send()`. SP First's and SP
+ * Third's manifests both have `mem_size` bumped for the owned-memory
+ * headroom `sp_ffa_mem_lend_cmd()` needs.
  */
 #define SMALL_SP_ID SP_ID(1)
 #define LARGE_SP_ID SP_ID(2)
+/*
+ * SP Third (v1.3). Used as the sender for the v1.1+ same-world SP-to-SP LEND
+ * tests below, so the fragment-cap relaxation itself (not the separate
+ * v1.0-specific cap) is what's being exercised.
+ */
+#define THIRD_SP_ID SP_ID(3)
 
 /* Large enough that fragmented sharing takes at least three fragments. */
 alignas(PAGE_SIZE) static uint8_t
@@ -348,11 +355,11 @@ TEST(ffa_mixed_mailbox, oversized_single_fragment_lend_other_world_rejected)
  * MM_PPOOL_ENTRY_SIZE allocation.
  *
  * Drive this as a genuine SP-to-SP LEND (SP First, pinned to v1.0 by its
- * manifest, LENDs to SP Second) via `SP_FFA_MEM_LEND_CMD`, both endpoints
- * SPs within the same SPMC instance, no hypervisor involved in initiating
- * the send. A `vm_primary`-driven LEND can't be used here: `vm_primary`
- * always crosses the hypervisor<->SPMC boundary, whose forwarding channel
- * is independently hard-capped at one page (see
+ * manifest, LENDs to SP Second), the same way
+ * `oversized_single_fragment_lend_sp_to_sp` below exercises the same-world
+ * relaxation for a v1.1+ sender. A `vm_primary`-driven LEND can't be used
+ * here: `vm_primary` always crosses the hypervisor<->SPMC boundary, whose
+ * forwarding channel is independently hard-capped at one page (see
  * `oversized_single_fragment_lend_other_world_rejected` above) regardless of
  * sender version, so it can't tell whether this v1.0-specific cap in
  * `api_ffa_mem_send()` is actually doing anything.
@@ -365,6 +372,88 @@ TEST(ffa_mixed_mailbox, oversized_single_fragment_lend_v1_0_rejected)
 	const ffa_id_t receiver_sp_id = LARGE_SP_ID;
 
 	remap_sp_mailbox(sender_sp_id, LARGE_MB_PAGES);
+	remap_sp_mailbox(receiver_sp_id, LARGE_MB_PAGES);
+
+	ret = sp_ffa_mem_lend_cmd_send(own_id, sender_sp_id, receiver_sp_id,
+				       OVERSIZED_CONSTITUENT_COUNT);
+	ASSERT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(ret), SP_ERROR);
+	EXPECT_EQ(sp_ffa_mem_lend_cmd_error(ret), FFA_INVALID_PARAMETERS);
+}
+
+/*
+ * `oversized_single_fragment_lend_other_world_rejected` above shows that a
+ * LEND from `vm_primary` (a Normal-World VM under a separate
+ * Hafnium-as-Hypervisor instance) to an SP always crosses the
+ * hypervisor<->SPMC boundary, so it can never exercise the same-world send
+ * path inside the SPMC itself. Drive a genuine SP-to-SP LEND instead (via
+ * `SP_FFA_MEM_LEND_CMD`, both endpoints are SPs in this one SPMC instance,
+ * no hypervisor involved) with a single fragment bigger than one FF-A page,
+ * to exercise the actual fragment-cap relaxation this test file exists
+ * for.
+ */
+TEST(ffa_mixed_mailbox, oversized_single_fragment_lend_sp_to_sp)
+{
+	struct ffa_value ret;
+	ffa_id_t own_id = hf_vm_get_id();
+	ffa_memory_handle_t handle;
+	/*
+	 * THIRD_SP_ID (SP Third) is the sender here: `sp_ffa_mem_lend_cmd()`
+	 * needs ~264 one-page constituents it genuinely owns beyond its own
+	 * `image_end`, and its manifest (manifest_service_sp_third.dts) has
+	 * `mem_size` bumped to cover that headroom. SP First (SMALL_SP_ID)
+	 * has the same `mem_size` headroom but can't be used here: its
+	 * manifest pins it to FF-A v1.0, which is intentionally still
+	 * capped at one page per fragment (see
+	 * `oversized_single_fragment_lend_v1_0_rejected` above), so it can't
+	 * exercise the same-world relaxation this test targets. LARGE_SP_ID
+	 * (SP Second) is the receiver; its mailbox is made large only so it
+	 * can retrieve the resulting response without needing
+	 * FFA_MEM_FRAG_RX to continue.
+	 */
+	const ffa_id_t sender_sp_id = THIRD_SP_ID;
+	const ffa_id_t receiver_sp_id = LARGE_SP_ID;
+
+	remap_sp_mailbox(sender_sp_id, LARGE_MB_PAGES);
+	remap_sp_mailbox(receiver_sp_id, LARGE_MB_PAGES);
+
+	ret = sp_ffa_mem_lend_cmd_send(own_id, sender_sp_id, receiver_sp_id,
+				       OVERSIZED_CONSTITUENT_COUNT);
+	ASSERT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	ASSERT_EQ(sp_resp(ret), SP_SUCCESS);
+	handle = sp_ffa_mem_lend_cmd_handle(ret);
+	ASSERT_NE(handle, FFA_MEMORY_HANDLE_INVALID);
+
+	ret = sp_ffa_mem_lend_retrieve_cmd_send(own_id, receiver_sp_id,
+						sender_sp_id, handle);
+	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(ret), SP_SUCCESS);
+
+	ret = sp_relinquish_shared_buffer_cmd_send(own_id, receiver_sp_id);
+	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(ret), SP_SUCCESS);
+}
+
+/*
+ * Same SP-to-SP LEND, but the sender's own TX buffer is only one page: the
+ * oversized descriptor can never fit in a single fragment through it, so
+ * `SP_FFA_MEM_LEND_CMD` must fail with FFA_INVALID_PARAMETERS regardless of
+ * the receiver's mailbox size. Guards against the same-world relaxation
+ * accidentally ignoring the sender's own buffer size. This fails while
+ * building the descriptor in `sp_ffa_mem_lend_cmd()` (the constituents
+ * don't fit in a one-page TX buffer), before `ffa_mem_lend()` is even
+ * called, so it doesn't depend on the sender's `mem_size` headroom the way
+ * `oversized_single_fragment_lend_sp_to_sp` above does.
+ */
+TEST(ffa_mixed_mailbox,
+     oversized_single_fragment_lend_sp_to_sp_small_sender_rejected)
+{
+	struct ffa_value ret;
+	ffa_id_t own_id = hf_vm_get_id();
+	const ffa_id_t sender_sp_id = THIRD_SP_ID;
+	const ffa_id_t receiver_sp_id = LARGE_SP_ID;
+
+	remap_sp_mailbox(sender_sp_id, SMALL_MB_PAGES);
 	remap_sp_mailbox(receiver_sp_id, LARGE_MB_PAGES);
 
 	ret = sp_ffa_mem_lend_cmd_send(own_id, sender_sp_id, receiver_sp_id,

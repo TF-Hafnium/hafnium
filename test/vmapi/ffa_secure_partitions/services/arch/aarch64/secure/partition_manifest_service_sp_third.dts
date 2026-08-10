@@ -17,7 +17,11 @@
 	execution-ctx-count = <8>;
 	exception-level = <2>; /* S-EL1 */
 	execution-state = <0>; /* AARCH64 */
-	load-address = <0x6280000>;
+	/*
+	 * Must match `load_address` in manifest_service_sp_third.dts (the
+	 * hypervisor-side manifest).
+	 */
+	load-address = <0x6180000>;
 	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
 	boot-order = <3>;
