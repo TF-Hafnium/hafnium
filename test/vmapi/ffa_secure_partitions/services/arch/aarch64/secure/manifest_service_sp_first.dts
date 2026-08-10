@@ -14,7 +14,19 @@
 			load_address = <0x6480000>;
 			debug_name = "SP Service First";
 			vcpu_count = <8>;
-			mem_size = <0x100000>;
+			/*
+			 * `mem_size` bumped from 0x100000 to 0x200000:
+			 * `sp_ffa_mem_lend_cmd()` (partition_services.c) needs
+			 * ~264 one-page constituents this SP genuinely owns
+			 * (beyond its own `image_end`) to LEND a single
+			 * fragment bigger than one FF-A page from a v1.0
+			 * sender. Only this manifest changes: the
+			 * secure_partitions_services binary itself is
+			 * unaffected (no dedicated static array), so other SPs
+			 * sharing that same binary via a different manifest
+			 * keep their original budgets.
+			 */
+			mem_size = <0x200000>;
                         /*
                          * Platform specific SiP SMC call handled at EL3. Used
                          * to pend an interrupt for testing purpose.

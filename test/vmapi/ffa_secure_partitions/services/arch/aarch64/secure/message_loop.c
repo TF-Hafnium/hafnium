@@ -286,7 +286,16 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 	case SP_FFA_MEM_LEND_RETRIEVE_CMD: {
 		ffa_memory_handle_t handle =
 			ffa_assemble_handle(res.arg4, res.arg5);
-		res = sp_ffa_mem_lend_retrieve_cmd(ffa_sender(res), handle);
+		ffa_id_t memory_sender_id = (ffa_id_t)res.arg6;
+		res = sp_ffa_mem_lend_retrieve_cmd(memory_sender_id,
+						   ffa_sender(res), handle);
+		break;
+	}
+	case SP_FFA_MEM_LEND_CMD: {
+		ffa_id_t lend_receiver_id = (ffa_id_t)res.arg4;
+		uint32_t constituent_count = (uint32_t)res.arg5;
+		res = sp_ffa_mem_lend_cmd(ffa_sender(res), lend_receiver_id,
+					  constituent_count);
 		break;
 	}
 	case SP_CHECK_RETRIEVE_RX_TAIL_CMD: {

@@ -33,7 +33,13 @@
 #define SMALL_MB_PAGES 1
 #define LARGE_MB_PAGES FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT
 
-/* The small-mailbox SP and the large-mailbox SP. */
+/*
+ * The small-mailbox SP and the large-mailbox SP. SP First is pinned to FF-A
+ * v1.0 by its manifest; used as the sender for
+ * `oversized_single_fragment_lend_v1_0_rejected` below, exercising the
+ * v1.0-specific one-page cap in `api_ffa_mem_send()`. SP First's `mem_size`
+ * is bumped for the owned-memory headroom `sp_ffa_mem_lend_cmd()` needs.
+ */
 #define SMALL_SP_ID SP_ID(1)
 #define LARGE_SP_ID SP_ID(2)
 
@@ -134,7 +140,8 @@ static void lend_fragmented_and_retrieve(void *send, size_t send_size,
 		remaining_constituent_count, fragment_length, total_length,
 		&handle, FFA_MEMORY_HANDLE_ALLOCATOR_SPMC);
 
-	ret = sp_ffa_mem_lend_retrieve_cmd_send(sender_id, receiver_id, handle);
+	ret = sp_ffa_mem_lend_retrieve_cmd_send(sender_id, receiver_id,
+						sender_id, handle);
 	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(ret), SP_SUCCESS);
 
@@ -248,7 +255,8 @@ TEST(ffa_mixed_mailbox, oversized_retrieve_response_large_mailbox)
 		remaining_constituent_count, fragment_length, total_length,
 		&handle, FFA_MEMORY_HANDLE_ALLOCATOR_SPMC);
 
-	ret = sp_ffa_mem_lend_retrieve_cmd_send(sender_id, LARGE_SP_ID, handle);
+	ret = sp_ffa_mem_lend_retrieve_cmd_send(sender_id, LARGE_SP_ID,
+						sender_id, handle);
 	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(ret), SP_SUCCESS);
 
@@ -329,6 +337,41 @@ TEST(ffa_mixed_mailbox, oversized_single_fragment_lend_other_world_rejected)
 	ret = ffa_mem_lend(total_length, fragment_length);
 	EXPECT_EQ(ret.func, FFA_ERROR_32);
 	EXPECT_EQ(ffa_error_code(ret), FFA_INVALID_PARAMETERS);
+}
+
+/*
+ * An FF-A v1.0 sender must still be capped at one page per fragment even
+ * with a multi-page TX buffer. This is not a constraint imposed by the FF-A
+ * specification itself, but by Hafnium's own implementation:
+ * `api_ffa_memory_transaction_descriptor_v1_1_from_v1_0()` assumes the
+ * whole first v1.0 fragment is available contiguously in a single
+ * MM_PPOOL_ENTRY_SIZE allocation.
+ *
+ * Drive this as a genuine SP-to-SP LEND (SP First, pinned to v1.0 by its
+ * manifest, LENDs to SP Second) via `SP_FFA_MEM_LEND_CMD`, both endpoints
+ * SPs within the same SPMC instance, no hypervisor involved in initiating
+ * the send. A `vm_primary`-driven LEND can't be used here: `vm_primary`
+ * always crosses the hypervisor<->SPMC boundary, whose forwarding channel
+ * is independently hard-capped at one page (see
+ * `oversized_single_fragment_lend_other_world_rejected` above) regardless of
+ * sender version, so it can't tell whether this v1.0-specific cap in
+ * `api_ffa_mem_send()` is actually doing anything.
+ */
+TEST(ffa_mixed_mailbox, oversized_single_fragment_lend_v1_0_rejected)
+{
+	struct ffa_value ret;
+	ffa_id_t own_id = hf_vm_get_id();
+	const ffa_id_t sender_sp_id = SMALL_SP_ID;
+	const ffa_id_t receiver_sp_id = LARGE_SP_ID;
+
+	remap_sp_mailbox(sender_sp_id, LARGE_MB_PAGES);
+	remap_sp_mailbox(receiver_sp_id, LARGE_MB_PAGES);
+
+	ret = sp_ffa_mem_lend_cmd_send(own_id, sender_sp_id, receiver_sp_id,
+				       OVERSIZED_CONSTITUENT_COUNT);
+	ASSERT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(ret), SP_ERROR);
+	EXPECT_EQ(sp_ffa_mem_lend_cmd_error(ret), FFA_INVALID_PARAMETERS);
 }
 
 #endif /* RXTX_MAX_PAGE_COUNT > 1 */

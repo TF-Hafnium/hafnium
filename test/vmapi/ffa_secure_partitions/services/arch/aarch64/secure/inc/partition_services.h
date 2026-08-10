@@ -197,6 +197,22 @@ enum sp_cmd {
 	SP_FFA_MEM_RETRIEVE_CMD,
 
 	/**
+	 * Request an SP to LEND a memory region it owns to another SP, in a
+	 * single fragment covering val2 constituents (each one page), and
+	 * return the resulting handle. Lets a test drive an FFA_MEM_LEND
+	 * whose sender and receiver are both SPs within the same SPMC
+	 * instance, with no Normal-World VM or separate hypervisor Hafnium
+	 * instance involved in initiating the send.
+	 * val1: the receiver SP's ID.
+	 * val2: number of one-page constituents to include (must be no more
+	 * than the sender's owned region can cover).
+	 * Returns SP_SUCCESS and the handle (val1/val2 of the response) if
+	 * `ffa_mem_lend` succeeded, or SP_ERROR and the FF-A error code
+	 * (val1 of the response) otherwise.
+	 */
+	SP_FFA_MEM_LEND_CMD,
+
+	/**
 	 * Request to start generic timer.
 	 */
 	SP_GENERIC_TIMER_START_CMD,
@@ -745,18 +761,57 @@ struct ffa_value sp_ffa_mem_retrieve_cmd(ffa_id_t sender_id,
 
 /**
  * Command to request SP to perform FFA_MEM_RETRIEVE_REQ against a handle
- * that was lent (not shared) to it.
+ * that was lent (not shared) to it. `dm_sender` is the direct-message
+ * sender field, which must be the real caller issuing this SMC (e.g.
+ * `hf_vm_get_id()` from a VM test, since a caller can't forge another
+ * endpoint's ID as the direct-message sender). `memory_sender_id` is the
+ * endpoint that actually lent the memory being retrieved: for a VM-to-SP
+ * LEND these are the same ID, but for an SP-to-SP LEND driven by this
+ * command (see `SP_FFA_MEM_LEND_CMD`), `memory_sender_id` is the lending
+ * SP while `dm_sender` is still the VM issuing the direct message.
  */
 static inline struct ffa_value sp_ffa_mem_lend_retrieve_cmd_send(
-	ffa_id_t sender, ffa_id_t receiver, ffa_memory_handle_t handle)
+	ffa_id_t dm_sender, ffa_id_t receiver, ffa_id_t memory_sender_id,
+	ffa_memory_handle_t handle)
 {
 	return ffa_msg_send_direct_req(
-		sender, receiver, SP_FFA_MEM_LEND_RETRIEVE_CMD,
-		(uint32_t)handle, (uint32_t)(handle >> 32), 0, 0);
+		dm_sender, receiver, SP_FFA_MEM_LEND_RETRIEVE_CMD,
+		(uint32_t)handle, (uint32_t)(handle >> 32), memory_sender_id,
+		0);
 }
 
 struct ffa_value sp_ffa_mem_lend_retrieve_cmd(ffa_id_t sender_id,
+					      ffa_id_t dm_response_dest,
 					      ffa_memory_handle_t handle);
+
+/**
+ * Command to request an SP to LEND a memory region it owns to another SP
+ * in a single fragment of `constituent_count` one-page constituents, both
+ * within the same SPMC instance.
+ */
+static inline struct ffa_value sp_ffa_mem_lend_cmd_send(
+	ffa_id_t sender, ffa_id_t receiver, ffa_id_t lend_receiver_id,
+	uint32_t constituent_count)
+{
+	return ffa_msg_send_direct_req(sender, receiver, SP_FFA_MEM_LEND_CMD,
+				       lend_receiver_id, constituent_count, 0,
+				       0);
+}
+
+static inline ffa_memory_handle_t sp_ffa_mem_lend_cmd_handle(
+	struct ffa_value res)
+{
+	return ffa_assemble_handle((uint32_t)res.arg4, (uint32_t)res.arg5);
+}
+
+static inline enum ffa_error sp_ffa_mem_lend_cmd_error(struct ffa_value res)
+{
+	return (enum ffa_error)res.arg4;
+}
+
+struct ffa_value sp_ffa_mem_lend_cmd(ffa_id_t sender_id,
+				     ffa_id_t lend_receiver_id,
+				     uint32_t constituent_count);
 
 /**
  * Request to start generic timer.

@@ -307,8 +307,8 @@ struct ffa_value sp_ffa_features_cmd(ffa_id_t source, uint32_t feature_func_id)
 alignas(PAGE_SIZE) static uint8_t retrieve_buffer[HF_MAILBOX_SIZE];
 
 static struct ffa_value retrieve_v1_0(
-	ffa_id_t sender_id, ffa_memory_handle_t handle,
-	ffa_memory_region_flags_t transaction_type,
+	ffa_id_t sender_id, ffa_id_t dm_response_dest,
+	ffa_memory_handle_t handle, ffa_memory_region_flags_t transaction_type,
 	enum ffa_instruction_access instruction_access)
 {
 	ffa_id_t receiver_id = hf_vm_get_id();
@@ -356,12 +356,12 @@ static struct ffa_value retrieve_v1_0(
 	shared_nwd_buffer_handle = memory_region_v1_0->handle;
 
 	/* Retrieved all the fragments. */
-	return sp_success(receiver_id, sender_id, ret.func);
+	return sp_success(receiver_id, dm_response_dest, ret.func);
 }
 
 static struct ffa_value retrieve_v1_2_or_later(
-	ffa_id_t sender_id, ffa_memory_handle_t handle,
-	ffa_memory_region_flags_t transaction_type,
+	ffa_id_t sender_id, ffa_id_t dm_response_dest,
+	ffa_memory_handle_t handle, ffa_memory_region_flags_t transaction_type,
 	enum ffa_instruction_access instruction_access)
 {
 	ffa_id_t receiver_id = hf_vm_get_id();
@@ -417,8 +417,9 @@ static struct ffa_value retrieve_v1_2_or_later(
 	 * memory_region_desc_from_rx_fragments() transparently fetched any
 	 * continuation fragments above.
 	 */
-	return ffa_msg_send_direct_resp(receiver_id, sender_id, SP_SUCCESS,
-					ret.func, fragment_length, 0, 0);
+	return ffa_msg_send_direct_resp(receiver_id, dm_response_dest,
+					SP_SUCCESS, ret.func, fragment_length,
+					0, 0);
 }
 
 struct ffa_value sp_ffa_mem_retrieve_cmd(ffa_id_t sender_id,
@@ -427,14 +428,14 @@ struct ffa_value sp_ffa_mem_retrieve_cmd(ffa_id_t sender_id,
 {
 	switch (ffa_version) {
 	case FFA_VERSION_1_0:
-		return retrieve_v1_0(sender_id, handle,
+		return retrieve_v1_0(sender_id, sender_id, handle,
 				     FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE,
 				     FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
 	case FFA_VERSION_1_1:
 	case FFA_VERSION_1_2:
 	case FFA_VERSION_1_3:
 		return retrieve_v1_2_or_later(
-			sender_id, handle,
+			sender_id, sender_id, handle,
 			FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE,
 			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
 	}
@@ -442,6 +443,7 @@ struct ffa_value sp_ffa_mem_retrieve_cmd(ffa_id_t sender_id,
 }
 
 struct ffa_value sp_ffa_mem_lend_retrieve_cmd(ffa_id_t sender_id,
+					      ffa_id_t dm_response_dest,
 					      ffa_memory_handle_t handle)
 {
 	enum ffa_version ffa_version =
@@ -449,16 +451,126 @@ struct ffa_value sp_ffa_mem_lend_retrieve_cmd(ffa_id_t sender_id,
 
 	switch (ffa_version) {
 	case FFA_VERSION_1_0:
-		return retrieve_v1_0(sender_id, handle,
+		return retrieve_v1_0(sender_id, dm_response_dest, handle,
 				     FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND,
 				     FFA_INSTRUCTION_ACCESS_NX);
 	default:
 		break;
 	}
 
-	return retrieve_v1_2_or_later(sender_id, handle,
+	return retrieve_v1_2_or_later(sender_id, dm_response_dest, handle,
 				      FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND,
 				      FFA_INSTRUCTION_ACCESS_NX);
+}
+
+/*
+ * Hafnium maps a partition's entire manifest `mem_size` window as owned
+ * RWX memory at boot (`load_ffa_partition()`), not just the portion backed
+ * by this image's own `.text`/`.data`/`.bss`. `image_end` (from
+ * `build/image/image.ld`) marks where those sections stop, already
+ * relocated to this partition's actual load address; anything between
+ * `image_end` and `load_address + mem_size` is unused-but-owned headroom
+ * this SP can reference as LEND constituents without declaring a new
+ * static array (which would otherwise bloat `.bss` for every other SP
+ * that reuses this same binary via a different manifest/load_address).
+ */
+extern uint8_t image_end[];
+
+struct ffa_value sp_ffa_mem_lend_cmd(ffa_id_t sender_id,
+				     ffa_id_t lend_receiver_id,
+				     uint32_t constituent_count)
+{
+	ffa_id_t own_id = hf_vm_get_id();
+	void *tx_buffer = SERVICE_SEND_BUFFER();
+	const size_t tx_size = (size_t)sp_mailbox_page_count * FFA_PAGE_SIZE;
+	enum ffa_version ffa_version =
+		hftest_get_context()->partition_manifest.ffa_version;
+	/*
+	 * Sized to the largest constituent count a test needs (see
+	 * `OVERSIZED_CONSTITUENT_COUNT` in mixed_mailbox_size.c). This array
+	 * of `ffa_memory_region_constituent` descriptors is small (16 bytes
+	 * each); only the memory it describes is deliberately kept outside
+	 * of `.bss` per the comment above.
+	 */
+	static struct ffa_memory_region_constituent constituents
+		[FFA_PAGE_SIZE / sizeof(struct ffa_memory_region_constituent) +
+		 8];
+	uint8_t *owned_pages_begin =
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		(uint8_t *)align_up((uintptr_t)image_end, PAGE_SIZE);
+	uint32_t total_length;
+	uint32_t fragment_length;
+	uint32_t remaining_constituent_count;
+	struct ffa_value ret;
+
+	if (constituent_count > ARRAY_SIZE(constituents)) {
+		return sp_error(own_id, sender_id, FFA_INVALID_PARAMETERS);
+	}
+
+	for (uint32_t i = 0; i < constituent_count; i++) {
+		constituents[i].address =
+			(uint64_t)owned_pages_begin + i * PAGE_SIZE;
+		constituents[i].page_count = 1;
+	}
+
+	/*
+	 * A v1.0 sender must build a v1.0-format descriptor:
+	 * `ffa_memory_access_v1_0` has no impdef field, and
+	 * `ffa_memory_region_init_v1_0()` always uses `FFA_MEMORY_NORMAL_MEM`
+	 * (v1.0 has no "not specified" memory type). This SP's own
+	 * `ffa_mem_lend()` call below is expected to be rejected by
+	 * `api_ffa_mem_send()`'s v1.0 one-page cap when the resulting
+	 * fragment exceeds one FF-A page, regardless of how the descriptor
+	 * was built.
+	 */
+	if (ffa_version == FFA_VERSION_1_0) {
+		struct ffa_memory_access_v1_0 receiver_v1_0;
+
+		ffa_memory_access_init_v1_0(
+			&receiver_v1_0, lend_receiver_id, FFA_DATA_ACCESS_RW,
+			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
+
+		remaining_constituent_count = ffa_memory_region_init_v1_0(
+			tx_buffer, tx_size, own_id, &receiver_v1_0, 1,
+			constituents, constituent_count, 0, 0,
+			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			FFA_MEMORY_INNER_SHAREABLE, &total_length,
+			&fragment_length);
+	} else {
+		struct ffa_memory_access receiver_v1_2;
+		struct ffa_memory_access_impdef impdef =
+			ffa_memory_access_impdef_init(lend_receiver_id,
+						      lend_receiver_id + 1);
+
+		ffa_memory_access_init(
+			&receiver_v1_2, lend_receiver_id, FFA_DATA_ACCESS_RW,
+			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &impdef);
+
+		remaining_constituent_count = ffa_memory_region_init(
+			tx_buffer, tx_size, own_id, &receiver_v1_2, 1,
+			sizeof(struct ffa_memory_access), constituents,
+			constituent_count, 0, 0, FFA_MEMORY_NOT_SPECIFIED_MEM,
+			FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE,
+			&total_length, &fragment_length);
+	}
+	if (remaining_constituent_count != 0) {
+		dlog_error(
+			"Descriptor for %d constituents didn't fit in a "
+			"single fragment of the sender's %zu-byte TX "
+			"buffer.\n",
+			constituent_count, tx_size);
+		return sp_error(own_id, sender_id, FFA_INVALID_PARAMETERS);
+	}
+
+	ret = ffa_mem_lend(total_length, fragment_length);
+	if (ret.func != FFA_SUCCESS_32) {
+		return sp_error(own_id, sender_id, ffa_error_code(ret));
+	}
+
+	return ffa_msg_send_direct_resp(
+		own_id, sender_id, SP_SUCCESS,
+		(uint32_t)ffa_mem_success_handle(ret),
+		(uint32_t)(ffa_mem_success_handle(ret) >> 32), 0, 0);
 }
 
 struct ffa_value sp_increment_shared_buffer_cmd(ffa_id_t sender_id)
