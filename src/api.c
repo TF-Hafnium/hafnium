@@ -2529,9 +2529,23 @@ struct ffa_value api_ffa_rx_acquire(ffa_id_t receiver_id, struct vcpu *current)
 	receiver_locked = ffa_vm_find_locked(receiver_id);
 	receiver = receiver_locked.vm;
 
-	if (receiver == NULL || receiver->mailbox.recv == NULL) {
-		dlog_error("Cannot retrieve RX buffer for VM ID %#x.\n",
+	/*
+	 * `ffa_vm_find_locked()` returns `{.vm = NULL}` without acquiring any
+	 * lock when the VM doesn't exist, so return directly rather than
+	 * falling through to `goto out`, which would call `vm_unlock()` on
+	 * the NULL `vm_locked` and dereference NULL.
+	 */
+	if (receiver == NULL) {
+		dlog_error("FFA_RX_ACQUIRE: VM ID %#x not found.\n",
 			   receiver_id);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (receiver->mailbox.recv == NULL) {
+		dlog_error(
+			"FFA_RX_ACQUIRE: RX buffer not mapped for VM ID "
+			"%#x.\n",
+			receiver_id);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
