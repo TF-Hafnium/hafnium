@@ -4581,23 +4581,42 @@ void ffa_memory_reclaim_relinquish_vm_regions(struct vm_locked vm_locked,
 	share_states_unlock(&share_states_locked);
 }
 
-/**
- * Updates the AMD based on the receiver and constituent.
- */
+/** Returns the constituent at the given index across all send fragments. */
+static struct ffa_memory_region_constituent *
+ffa_memory_share_state_get_constituent(
+	struct ffa_memory_share_state *share_state, uint32_t constituent_index)
+{
+	for (uint32_t i = 0; i < share_state->fragment_count; ++i) {
+		uint32_t fragment_constituent_count =
+			share_state->fragment_constituent_counts[i];
+
+		if (constituent_index < fragment_constituent_count) {
+			return &share_state->fragments[i][constituent_index];
+		}
+
+		constituent_index -= fragment_constituent_count;
+	}
+
+	return NULL;
+}
+
+/** Updates the AMD based on the receiver and constituent. */
 static bool ffa_memory_init_amd_from_constituent(
 	struct ffa_address_map_desc *amd, struct ffa_memory_access *receiver,
-	struct ffa_composite_memory_region *composite,
-	const uint16_t *con_index)
+	struct ffa_memory_share_state *share_state, const uint16_t *con_index)
 {
 	ffa_amd_permissions_t permissions;
 	uint32_t default_mode = 0;
 	uint32_t mode = ffa_memory_permissions_to_mode(
 		receiver->receiver_permissions.permissions, default_mode);
 	struct ffa_memory_region_constituent *constituent =
-		&composite->constituents[*con_index];
+		ffa_memory_share_state_get_constituent(share_state, *con_index);
 	ffa_id_t vm_id = receiver->receiver_permissions.receiver;
 	struct vm *vm = vm_find(vm_id);
 	bool privileged = false;
+
+	/* A complete share state must contain every declared constituent. */
+	CHECK(constituent != NULL);
 
 	/*
 	 * If the VM comes back NULL, it could mean that the sender
@@ -4639,8 +4658,9 @@ static bool ffa_memory_traverse_share_states(struct ffa_address_map_desc *amd,
 					     uint16_t *con_index)
 {
 	bool success = false;
-	struct ffa_memory_region *mem_region =
-		share_states[current_index].memory_region;
+	struct ffa_memory_share_state *share_state =
+		&share_states[current_index];
+	struct ffa_memory_region *mem_region = share_state->memory_region;
 
 	/* Loop through all receivers. */
 	for (uint32_t i = *rec_index; i < mem_region->receiver_count; i++) {
@@ -4664,7 +4684,7 @@ static bool ffa_memory_traverse_share_states(struct ffa_address_map_desc *amd,
 			 * next AMD, otherwise, continue looping.
 			 */
 			if (ffa_memory_init_amd_from_constituent(
-				    amd, receiver, composite, con_index)) {
+				    amd, receiver, share_state, con_index)) {
 				success = true;
 				break;
 			}
