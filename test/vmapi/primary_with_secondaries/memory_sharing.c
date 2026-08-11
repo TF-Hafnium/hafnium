@@ -3048,8 +3048,8 @@ TEST(memory_sharing_v1_0, ffa_validate_memory_access_reserved_mbz)
 }
 
 /**
- * Check that large values for the memory access descriptor size
- * and receiver count return INVALID_PARAMETERS and cannot be used
+ * Check that large values for the memory access descriptor size, receiver
+ * count, and receiver offset return INVALID_PARAMETERS and cannot be used
  * to access data outside of the receivers array.
  */
 TEST(memory_sharing, ffa_memory_access_no_overflow)
@@ -3116,7 +3116,32 @@ TEST(memory_sharing, ffa_memory_access_no_overflow)
 		EXPECT_EQ(ret.func, FFA_ERROR_32);
 		EXPECT_TRUE(ffa_error_code(ret) == FFA_INVALID_PARAMETERS);
 	}
+
+	/*
+	 * Check receivers_offset cannot wrap the receiver array end back to 0
+	 * and bypass the fragment bounds check.
+	 */
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+			  mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(),
+			  service1_info->vm_id, constituents,
+			  ARRAY_SIZE(constituents), 0, 0,
+			  FFA_DATA_ACCESS_NOT_SPECIFIED,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
+		  0);
+
+	memory_region->receivers_offset =
+		UINT32_MAX - sizeof(struct ffa_memory_access) + 1;
+
+	for (unsigned int i = 0; i < ARRAY_SIZE(send_function); i++) {
+		ret = send_function[i](msg_size, msg_size);
+		EXPECT_EQ(ret.func, FFA_ERROR_32);
+		EXPECT_TRUE(ffa_error_code(ret) == FFA_INVALID_PARAMETERS);
+	}
 }
+
 /**
  * Memory can't be shared if flags in the memory transaction description that
  * Must Be Zero, are not.

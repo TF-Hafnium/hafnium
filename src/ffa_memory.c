@@ -532,6 +532,7 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 	uint32_t receiver_count;
 	uint32_t receivers_offset;
 	uint32_t receivers_size;
+	uint64_t receivers_end;
 	struct ffa_memory_access *receiver;
 	uint32_t composite_offset_0;
 	struct ffa_memory_region_v1_0 *memory_region_v1_0 =
@@ -589,13 +590,14 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 	 * Check that the fragment is large enough to hold the entire receiver
 	 * array
 	 */
-	if (fragment_length <
-	    receivers_offset + receivers_size * receiver_count) {
+	receivers_end = (uint64_t)receivers_offset +
+			(uint64_t)receivers_size * receiver_count;
+	if (receivers_end > fragment_length) {
 		dlog_verbose(
-			"Initial fragment length %d smaller than header size "
-			"%u.\n",
-			fragment_length,
-			receivers_offset + receivers_size * receiver_count);
+			"Receiver array (offset %u + %u * %u) exceeds initial "
+			"fragment length %u.\n",
+			receivers_offset, receivers_size, receiver_count,
+			fragment_length);
 		return false;
 	}
 
