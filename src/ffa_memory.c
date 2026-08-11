@@ -4716,6 +4716,7 @@ bool ffa_memory_get_share_states_info(struct ffa_address_map_desc *amd,
 	for (uint32_t i = *memory_index; i < MAX_MEM_SHARES; i++) {
 		/* Look for a valid index. */
 		if ((share_states[i].share_func != 0) &&
+		    share_states[i].sending_complete &&
 		    ffa_is_vm_id(share_states[i].memory_region->sender)) {
 			*memory_index = i;
 
