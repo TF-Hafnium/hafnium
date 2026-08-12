@@ -7,3 +7,4 @@ Security Advisories
 
    security-advisory-hfv-1.rst
    security-advisory-hfv-2.rst
+   security-advisory-hfv-3.rst

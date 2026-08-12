@@ -49,6 +49,9 @@ Security Advisories
 | |HFV-2|   | FFA_NS_RES_INFO_GET may read beyond fragmented memory-send       |
 |           | descriptors                                                      |
 +-----------+------------------------------------------------------------------+
+| |HFV-3|   | Integer overflow in FF-A receiver array bounds check can cause   |
+|           | an out-of-bounds access                                          |
++-----------+------------------------------------------------------------------+
 
 .. _issue tracker: https://github.com/TF-Hafnium/hafnium/issues
 .. _mailing list: https://lists.trustedfirmware.org/mailman3/lists/hafnium.lists.trustedfirmware.org/
@@ -56,6 +59,7 @@ Security Advisories
 
 .. |HFV-1| replace:: :ref:`Advisory HFV-1 (CVE-2025-10263)`
 .. |HFV-2| replace:: :ref:`Advisory HFV-2 (CVE-2026-73092)`
+.. |HFV-3| replace:: :ref:`Advisory HFV-3 (CVE-2026-73093)`
 
 --------------
 
