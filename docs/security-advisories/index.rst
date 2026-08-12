@@ -6,3 +6,4 @@ Security Advisories
    :caption: Contents
 
    security-advisory-hfv-1.rst
+   security-advisory-hfv-2.rst
