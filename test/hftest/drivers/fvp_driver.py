@@ -491,7 +491,7 @@ class FvpDriverSPMC(FvpDriver):
         # Packages are optional and used in live activation scenarios
         self.pkgs_in_partitions_json = args.partitions and args.partitions.get("Packages")
         self._spmc_address = 0x6000000
-        self._spmc_dtb_address = 0x0403f000
+        self._spmc_dtb_address = 0x0405f000
 
     def gen_dts(self, dt, test_args):
         """Create a DeviceTree source which will be compiled into a DTB and

@@ -45,9 +45,9 @@ run:
     # Spacing Offset 3: adds spacing to keep key unique for Shrinkwrap
     '   --data cluster0.cpu0': out/reference/secure_aem_v8a_fvp_vhe_clang/hafnium.bin@0x6000000
 
-    # Load SPMC DTB at 0x0403F000
+    # Load SPMC DTB at 0x0405F000
     # Spacing Offset 4: prevents YAML key override
-    '    --data cluster0.cpu0': ${rtvar:SPMC_DTB}@0x403F000
+    '    --data cluster0.cpu0': ${rtvar:SPMC_DTB}@0x405F000
 
 # Note:
 # VMs and SPs inclusion is applied via overlay (dynamically generated) from hftest.py script.
