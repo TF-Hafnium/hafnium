@@ -5383,6 +5383,174 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_multiple_calls,
 }
 
 /**
+ * Verify that FFA_NS_RES_INFO_GET walks the stored fragments of a completed
+ * memory transaction rather than treating them as a contiguous array after
+ * the composite descriptor in the first fragment.
+ *
+ * Keep the first fragment of a second transaction allocated while completing
+ * the first transaction. This places a live allocation between the first
+ * transaction's fragments and prevents linear indexing from accidentally
+ * working because the fragment allocations happen to be adjacent.
+ */
+TEST_PRECONDITION(ffa_ns_res_info_get, completed_noncontiguous_fragments,
+		  service1_has_ns_mem_and_sel1)
+{
+	uint32_t current_size;
+	uint32_t remaining_size;
+	uint32_t remaining_amds;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_resource_info_desc_header *header = mb.recv;
+	struct ffa_address_map_desc *amd_array =
+		(struct ffa_address_map_desc
+			 *)((uint8_t *)mb.recv +
+			    sizeof(struct ffa_resource_info_desc_header));
+	struct ffa_memory_region_constituent separator_constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 1},
+		{.address = (uint64_t)pages + PAGE_SIZE, .page_count = 1},
+	};
+	uint32_t transaction_a_remaining;
+	uint32_t transaction_a_fragment_length;
+	uint32_t transaction_a_total_length;
+	uint32_t transaction_a_first_fragment_count;
+	uint32_t transaction_b_remaining;
+	uint32_t transaction_b_fragment_length;
+	uint32_t transaction_b_total_length;
+	ffa_memory_handle_t transaction_a_handle;
+	ffa_memory_handle_t transaction_b_handle;
+	struct ffa_value ret;
+	uint32_t constituent_index = 0;
+	const uint8_t offset_index = 3;
+
+	/* Use distinct addresses so an incorrectly selected record is visible.
+	 */
+	for (uint32_t i = 0;
+	     i < ARRAY_SIZE(constituents_lend_fragmented_relinquish); ++i) {
+		constituents_lend_fragmented_relinquish[i].address =
+			(uint64_t)pages + i * PAGE_SIZE;
+		constituents_lend_fragmented_relinquish[i].page_count = 1;
+		constituents_lend_fragmented_relinquish[i].reserved = 0;
+	}
+
+	/* Start transaction A, retaining its full first fragment. */
+	transaction_a_remaining = ffa_memory_region_init_single_receiver(
+		mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(), service1_info->vm_id,
+		constituents_lend_fragmented_relinquish,
+		ARRAY_SIZE(constituents_lend_fragmented_relinquish), 0, 0,
+		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_INNER_SHAREABLE, NULL, &transaction_a_total_length,
+		&transaction_a_fragment_length);
+	ASSERT_NE(transaction_a_remaining, 0);
+	ASSERT_EQ(transaction_a_fragment_length, HF_MAILBOX_SIZE);
+	transaction_a_first_fragment_count =
+		ARRAY_SIZE(constituents_lend_fragmented_relinquish) -
+		transaction_a_remaining;
+
+	ret = ffa_mem_lend(transaction_a_total_length,
+			   transaction_a_fragment_length);
+	ASSERT_EQ(ret.func, FFA_MEM_FRAG_RX_32);
+	transaction_a_handle = ffa_frag_handle(ret);
+
+	/*
+	 * Retain transaction B's initial fragment so its allocation separates
+	 * transaction A's initial and continuation fragments.
+	 */
+	transaction_b_remaining = ffa_memory_region_init_single_receiver(
+		mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(), service1_info->vm_id,
+		separator_constituents, ARRAY_SIZE(separator_constituents), 0,
+		0, FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_INNER_SHAREABLE, NULL, &transaction_b_total_length,
+		&transaction_b_fragment_length);
+	ASSERT_EQ(transaction_b_remaining, 0);
+	transaction_b_fragment_length -=
+		sizeof(struct ffa_memory_region_constituent);
+
+	ret = ffa_mem_lend(transaction_b_total_length,
+			   transaction_b_fragment_length);
+	ASSERT_EQ(ret.func, FFA_MEM_FRAG_RX_32);
+	transaction_b_handle = ffa_frag_handle(ret);
+
+	/* Complete transaction A while transaction B's allocation remains live.
+	 */
+	while (transaction_a_remaining != 0) {
+		transaction_a_remaining = ffa_memory_fragment_init(
+			mb.send, HF_MAILBOX_SIZE,
+			constituents_lend_fragmented_relinquish +
+				ARRAY_SIZE(
+					constituents_lend_fragmented_relinquish) -
+				transaction_a_remaining,
+			transaction_a_remaining,
+			&transaction_a_fragment_length);
+		ret = ffa_mem_frag_tx(transaction_a_handle,
+				      transaction_a_fragment_length);
+	}
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+	ASSERT_EQ(ffa_mem_success_handle(ret), transaction_a_handle);
+
+	ret = ffa_ns_res_info_get(FFA_NS_RES_INFO_GET_REQ_START_FLAGS);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_64);
+
+	current_size = (uint32_t)(ret.arg2 >> 32);
+	remaining_size = (uint32_t)ret.arg2;
+	remaining_amds =
+		(current_size / sizeof(struct ffa_address_map_desc)) - 1;
+
+	EXPECT_EQ(header->amd_count,
+		  ARRAY_SIZE(constituents_lend_fragmented_relinquish) + 3);
+
+	while (true) {
+		uint32_t start_index =
+			(constituent_index == 0) ? offset_index : 0;
+
+		for (uint32_t i = start_index; i < remaining_amds; ++i) {
+			EXPECT_EQ(amd_array[i].base_address,
+				  constituents_lend_fragmented_relinquish
+					  [constituent_index]
+						  .address);
+			EXPECT_EQ(amd_array[i].page_count, 1);
+			EXPECT_EQ(amd_array[i].endpoint_id,
+				  service1_info->vm_id);
+			constituent_index++;
+		}
+
+		if (remaining_size == 0) {
+			break;
+		}
+
+		ret = ffa_ns_res_info_get(FFA_NS_RES_INFO_GET_REQ_CONT_FLAGS);
+		ASSERT_EQ(ret.func, FFA_SUCCESS_64);
+		current_size = (uint32_t)(ret.arg2 >> 32);
+		remaining_size = (uint32_t)ret.arg2;
+		amd_array = (struct ffa_address_map_desc *)mb.recv;
+		remaining_amds =
+			current_size / sizeof(struct ffa_address_map_desc);
+	}
+
+	EXPECT_EQ(constituent_index,
+		  ARRAY_SIZE(constituents_lend_fragmented_relinquish));
+	/* Explicitly confirm that enumeration crossed the first boundary. */
+	EXPECT_LT(transaction_a_first_fragment_count, constituent_index);
+
+	/* Reclaim A before completing B, as their test pages overlap. */
+	ret = ffa_mem_reclaim(transaction_a_handle, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	transaction_b_remaining = ffa_memory_fragment_init(
+		mb.send, HF_MAILBOX_SIZE, &separator_constituents[1], 1,
+		&transaction_b_fragment_length);
+	ASSERT_EQ(transaction_b_remaining, 0);
+	ret = ffa_mem_frag_tx(transaction_b_handle,
+			      transaction_b_fragment_length);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+	ASSERT_EQ(ffa_mem_success_handle(ret), transaction_b_handle);
+
+	ret = ffa_mem_reclaim(transaction_b_handle, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+}
+
+/**
  * Use the FFA_NS_RES_INFO_GET to obtain information
  * memory that is allocated to all secure partitions.
  * This tests S-EL0 partitions specifically.
