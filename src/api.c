@@ -4708,11 +4708,10 @@ struct ffa_value api_ffa_notification_get(ffa_id_t receiver_vm_id,
 	 */
 	receiver_locked = ffa_vm_find_locked(receiver_vm_id);
 
-	/*
-	 * `ffa_notifications_is_get_valid` ensures following is never
-	 * true.
-	 */
-	CHECK(receiver_locked.vm != NULL);
+	if (receiver_locked.vm == NULL) {
+		dlog_verbose("Receiver VM %#x not found.\n", receiver_vm_id);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
 
 	if (receiver_locked.vm->vcpu_count <= vcpu_id) {
 		dlog_verbose(
