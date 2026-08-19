@@ -2656,15 +2656,14 @@ uint32_t api_interrupt_get(struct vcpu_locked current_locked)
  *   - Apart from a single outstanding invocation of FFA_VERSION, there are
  *     outstanding invocations of any other FF-A ABI on any PE from the
  *     partition.
- * NOTE: For now the invocation count condition has not been implemented. This
- * will come in a subsequent patch.
  */
-static bool vm_ffa_in_use(struct vm_locked vm_locked)
+static bool vm_ffa_in_use(struct vm_locked vm_locked, struct vcpu *current)
 {
 	return vm_rxtx_mapped(vm_locked) ||
 	       vm_notifications_any_bound(vm_locked) ||
 	       vm_are_fwk_notifications_pending(vm_locked) ||
-	       ffa_memory_vm_share_outstanding(vm_locked.vm->id);
+	       ffa_memory_vm_share_outstanding(vm_locked.vm->id) ||
+	       vm_are_ffa_invocations_outstanding(vm_locked, current);
 }
 
 /**
@@ -2751,7 +2750,7 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 
 	current_vm_locked = vm_lock(current->vm);
 
-	if (vm_ffa_in_use(current_vm_locked)) {
+	if (vm_ffa_in_use(current_vm_locked, current)) {
 		vm_unlock(&current_vm_locked);
 		dlog_error(
 			"FFA_VERSION: Framework in use, returning Null "

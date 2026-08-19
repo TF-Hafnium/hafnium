@@ -337,6 +337,51 @@ bool vm_is_mailbox_other_world_owned(struct vm_locked to)
 }
 
 /**
+ * Returns whether the VM has any outstanding FF-A invocations.
+ * Hafnium tracks this by checking for vCPUs in an active state, excluding the
+ * current vCPU because it may be executing the FFA_VERSION invocation that
+ * triggered this check.
+ */
+bool vm_are_ffa_invocations_outstanding(struct vm_locked vm_locked,
+					const struct vcpu *current)
+{
+	struct vm *vm = vm_locked.vm;
+	bool in_use = false;
+
+	assert(current->vm == vm);
+
+	for (ffa_vcpu_index_t i = 0; i < vm->vcpu_count; ++i) {
+		struct vcpu *vcpu = vm_get_vcpu(vm, i);
+		struct vcpu_locked vcpu_locked;
+
+		if (vcpu == current) {
+			continue;
+		}
+
+		vcpu_locked = vcpu_lock(vcpu);
+
+		/*
+		 * Treat a vCPU with an active state as having an outstanding
+		 * invocation.
+		 */
+		in_use = !(vcpu_locked.vcpu->state == VCPU_STATE_WAITING ||
+			   vcpu_locked.vcpu->state == VCPU_STATE_CREATED ||
+			   vcpu_locked.vcpu->state == VCPU_STATE_OFF ||
+			   vcpu_locked.vcpu->state == VCPU_STATE_ABORTED ||
+			   vcpu_locked.vcpu->state == VCPU_STATE_NULL ||
+			   vcpu_locked.vcpu->state == VCPU_STATE_STOPPED);
+
+		vcpu_unlock(&vcpu_locked);
+
+		if (in_use) {
+			break;
+		}
+	}
+
+	return in_use;
+}
+
+/**
  * Return whether the given VM ID represents an entity in the current world:
  * i.e. the hypervisor or a normal world VM when running in the normal world, or
  * the SPM or an SP when running in the secure world.
