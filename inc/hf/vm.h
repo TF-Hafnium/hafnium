@@ -187,13 +187,6 @@ struct vm {
 	enum ffa_version ffa_version;
 	enum vm_state state;
 
-	/*
-	 * Whether this FF-A instance has negotiated an FF-A version through a
-	 * call to FFA_VERSION. Once the version has been negotiated, it is an
-	 * error to attempt to change it through another call to FFA_VERSION.
-	 */
-	bool ffa_version_negotiated;
-
 	struct smc_whitelist smc_whitelist;
 
 	/** See api.c for the partial ordering on locks. */
@@ -396,6 +389,8 @@ bool vm_notifications_info_get(struct vm_locked vm_locked, uint16_t *ids,
 			       uint32_t *lists_count, uint32_t ids_max_count);
 bool vm_supports_messaging_method(struct vm *vm, uint16_t messaging_method);
 void vm_set_boot_info_gp_reg(struct vm *vm, struct vcpu *vcpu);
+bool vm_are_ffa_invocations_outstanding(struct vm_locked vm_locked,
+					const struct vcpu *current);
 
 /**
  * Returns true if the VM requested to receive cpu off power management
