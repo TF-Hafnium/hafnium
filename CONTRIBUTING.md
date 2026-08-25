@@ -29,17 +29,33 @@ To submit a change:
     of the [Developer Certificate of Origin](dco.txt). More details may be found
     in the
     [Gerrit Signed-off-by Lines guidelines](https://review.trustedfirmware.org/Documentation/user-signedoffby.html).
-7.  Run the [tests](docs/Testing.md) and other presubmit checks with
+7.  If a patch should be considered for LTS backporting, keep the normal
+    Hafnium commit subject format and add an `LTS-candidate: yes` trailer to
+    the footer block at the end of the commit message. For example:
+
+    ```
+    fix(mm): correct memory-region validation
+
+    Reject invalid memory regions before updating the receiver's mappings.
+
+    Signed-off-by: Developer Name <developer@example.com>
+    Change-Id: I0123456789abcdef0123456789abcdef01234567
+    LTS-candidate: yes
+    ```
+
+    This trailer identifies the change for LTS triage. LTS maintainers retain
+    the final say on whether it is accepted into an LTS branch.
+8.  Run the [tests](docs/Testing.md) and other presubmit checks with
     `kokoro/build.sh`, ensure they all pass.
-8.  Upload the change to Gerrit with `git push origin HEAD:refs/for/master`. If
+9.  Upload the change to Gerrit with `git push origin HEAD:refs/for/master`. If
     you have changed submodules then you'll need to push them as well.
-9.  If you changed submodules, then add a matching 'topic' from the Gerrit UI
+10.  If you changed submodules, then add a matching 'topic' from the Gerrit UI
     for all your changes (submodules and the main repository) so that they can
     be reviewed and submitted together.
-10. Wait 20-30 minutes for the presubmit tests to run, and make sure a 'Verified
+11. Wait 20-30 minutes for the presubmit tests to run, and make sure a 'Verified
     +1' comment shows up in Gerrit indicating that they have passed. If not,
     follow the links to find the errors, fix them and try again.
-11. From the Gerrit UI add one or more reviewers. Looking at who has modified
+12. From the Gerrit UI add one or more reviewers. Looking at who has modified
     the same files frequently recently is usually a good way to pick a reviewer.
     Add a maintainer listed in the [maintainers](docs/Maintainers.md) page, who
     will perform a final review and eventually approve the change.

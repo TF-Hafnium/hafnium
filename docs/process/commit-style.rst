@@ -113,6 +113,25 @@ be done automatically for you.
 
 More details may be found in the `Gerrit Change-Ids documentation`_.
 
+Optional Automation Trailers
+----------------------------
+
+Hafnium workflows may use additional machine-readable trailers to simplify
+triage and backporting. For LTS triage, developers may add
+``LTS-candidate: yes`` to the footer block at the end of a commit message. This
+indicates to the LTS maintainers that the patch should be evaluated as a
+candidate for a future LTS release. It also allows LTS triage tooling to
+identify the patch automatically.
+
+The trailer is optional and does not change the standard Hafnium commit subject
+format. The subject must remain a normal Conventional Commits subject,
+including a mandatory Hafnium scope, such as ``fix(mm): ...``.
+
+LTS maintainers retain the final say on whether a patch is accepted into an LTS
+branch. Reviewers and maintainers should also identify LTS-eligible patches
+submitted without this trailer and ask authors to add it in a later patch set
+where practical.
+
 Commit Linting
 --------------
 
