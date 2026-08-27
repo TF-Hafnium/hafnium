@@ -21,6 +21,7 @@
 	entrypoint-offset = <0x0>;
 	xlat-granule = <0>; /* 4KiB */
 	gp-register-num = <0>;
+	notification-support; /* Receipt of notifications. */
 
 	services {
 		compatible = "arm,ffa-manifest-services";
