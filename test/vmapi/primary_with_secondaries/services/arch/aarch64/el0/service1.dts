@@ -23,6 +23,7 @@
 	xlat-granule = <0>; /* 4KiB */
 	messaging-method = <7>; /* Direct and indirect messaging */
 	gp-register-num = <0>;
+	notification-support; /* Receipt of notifications. */
 
 	/* Boot Info */
 	boot-info {
