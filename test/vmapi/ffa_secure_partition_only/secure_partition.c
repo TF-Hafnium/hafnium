@@ -1215,3 +1215,46 @@ TEST(ffa_version, rejects_reserved_input_flags)
 	EXPECT_EQ(ffa_version(0, VERSION_QUERY_GET_NEGOTIATED),
 		  negotiated_version);
 }
+
+TEST(ffa_version, compat_check)
+{
+	EXPECT_EQ(
+		ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_COMPATIBILITY),
+		FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_1, VERSION_QUERY_COMPATIBILITY),
+		  FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(0x0, VERSION_QUERY_COMPATIBILITY),
+		  FFA_VERSION_1_0);
+	EXPECT_EQ(ffa_version(0x1, VERSION_QUERY_COMPATIBILITY),
+		  FFA_VERSION_1_0);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED + 1,
+			      VERSION_QUERY_COMPATIBILITY),
+		  FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(0xffff, VERSION_QUERY_COMPATIBILITY),
+		  FFA_VERSION_1_0);
+	EXPECT_EQ(ffa_version(0xfffffff, VERSION_QUERY_COMPATIBILITY),
+		  FFA_VERSION_COMPILED);
+	EXPECT_EQ((uint32_t)ffa_version(
+			  FFA_VERSION_COMPILED | FFA_VERSION_MBZ_BIT,
+			  VERSION_QUERY_COMPATIBILITY),
+		  SMCCC_INVALID_PARAMETER);
+}
+
+TEST(ffa_version, compat_check_succeeds_when_framework_in_use_rxtx_buffer)
+{
+	const enum ffa_version initial_version = FFA_VERSION_1_2;
+	const enum ffa_version null_version = make_ffa_version(0, 0);
+
+	EXPECT_EQ(ffa_version(0, VERSION_QUERY_GET_NEGOTIATED),
+		  initial_version);
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+	EXPECT_EQ(
+		ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_COMPATIBILITY),
+		FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(0, VERSION_QUERY_GET_NEGOTIATED),
+		  initial_version);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  null_version);
+	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+}

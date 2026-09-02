@@ -248,6 +248,30 @@ TEST(ffa, ffa_version_rejects_reserved_input_flags)
 	EXPECT_EQ(ffa_version(0, VERSION_QUERY_GET_NEGOTIATED),
 		  negotiated_version);
 }
+
+TEST(ffa, ffa_version_compat_check)
+{
+	EXPECT_EQ(
+		ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_COMPATIBILITY),
+		FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_1, VERSION_QUERY_COMPATIBILITY),
+		  FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(0x0, VERSION_QUERY_COMPATIBILITY),
+		  FFA_VERSION_1_0);
+	EXPECT_EQ(ffa_version(0x1, VERSION_QUERY_COMPATIBILITY),
+		  FFA_VERSION_1_0);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED + 1,
+			      VERSION_QUERY_COMPATIBILITY),
+		  FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(0xffff, VERSION_QUERY_COMPATIBILITY),
+		  FFA_VERSION_1_0);
+	EXPECT_EQ(ffa_version(0xfffffff, VERSION_QUERY_COMPATIBILITY),
+		  FFA_VERSION_COMPILED);
+	EXPECT_EQ((uint32_t)ffa_version(
+			  FFA_VERSION_COMPILED | FFA_VERSION_MBZ_BIT,
+			  VERSION_QUERY_COMPATIBILITY),
+		  SMCCC_INVALID_PARAMETER);
+}
 static bool v1_0_or_later(void)
 {
 	return FFA_VERSION_COMPILED >= FFA_VERSION_1_0;
@@ -256,6 +280,21 @@ static bool v1_0_or_later(void)
 static bool v1_1_or_later(void)
 {
 	return FFA_VERSION_COMPILED >= FFA_VERSION_1_1;
+}
+
+TEST_PRECONDITION(ffa, ffa_version_compat_check_does_not_update_current,
+		  v1_1_or_later)
+{
+	const enum ffa_version negotiated_version = FFA_VERSION_1_0;
+
+	EXPECT_EQ(ffa_version(negotiated_version, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(0, VERSION_QUERY_GET_NEGOTIATED),
+		  negotiated_version);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_1, VERSION_QUERY_COMPATIBILITY),
+		  FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(0, VERSION_QUERY_GET_NEGOTIATED),
+		  negotiated_version);
 }
 
 static bool v1_2_or_later(void)
