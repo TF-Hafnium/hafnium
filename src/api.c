@@ -3945,6 +3945,27 @@ static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
+/**
+ * Check that `fragment_length` is at least large enough to contain the
+ * memory region transaction descriptor's fixed-size header for the given
+ * FF-A version. Must be checked before any header field (memory_access_desc_
+ * size, receivers_offset, receiver_count, ...) is read out of the copied-in
+ * buffer. Without this check, a short fragment leaves those fields backed by
+ * whatever previously occupied the buffer - a prior transaction's leftover
+ * bytes on a reused allocation, or another partition's data on the retrieve
+ * path's shared per-CPU buffer - rather than by data the current caller
+ * actually sent.
+ */
+static bool api_ffa_memory_region_header_fits(uint32_t fragment_length,
+					      enum ffa_version ffa_version)
+{
+	size_t header_size = (ffa_version == FFA_VERSION_1_0)
+				     ? sizeof(struct ffa_memory_region_v1_0)
+				     : sizeof(struct ffa_memory_region);
+
+	return fragment_length >= header_size;
+}
+
 struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 				  uint32_t fragment_length, ipaddr_t address,
 				  uint32_t page_count, struct vcpu *current)
@@ -4039,6 +4060,15 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 			"%s: Failed to copy FF-A memory region descriptor.\n",
 			__func__);
 		ret = ffa_error(FFA_ABORTED);
+		goto out;
+	}
+
+	if (!api_ffa_memory_region_header_fits(fragment_length, ffa_version)) {
+		dlog_verbose(
+			"Fragment length %d too small for memory region "
+			"transaction descriptor header.\n",
+			fragment_length);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
@@ -4252,6 +4282,23 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 			"descriptor.\n",
 			__func__);
 		ret = ffa_error(FFA_ABORTED);
+		goto out;
+	}
+
+	/*
+	 * retrieve_msg is the shared per-CPU buffer (cpu_get_buffer()), reused
+	 * across VMs/partitions scheduled on this core, so a short request
+	 * must be rejected before any header field (including receiver_count,
+	 * read by is_ffa_hypervisor_retrieve_request() right below) is read
+	 * from it - otherwise those fields would be sourced from whatever
+	 * previous, possibly unrelated, request last populated the buffer.
+	 */
+	if (!api_ffa_memory_region_header_fits(fragment_length, ffa_version)) {
+		dlog_verbose(
+			"Fragment length %d too small for memory region "
+			"transaction descriptor header.\n",
+			fragment_length);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
