@@ -764,17 +764,51 @@ As part of the FF-A v1.2 support, the following interfaces were added:
 FFA_VERSION
 ~~~~~~~~~~~
 
-``FFA_VERSION`` requires a *requested_version* parameter from the caller.
-The returned value depends on the caller:
+``FFA_VERSION`` supports version negotiation and discovery. The caller supplies
+a *requested_version* in W1 and a query type in bits [1:0] of W2:
 
-- Hypervisor or OS kernel in NS-EL1/EL2: the SPMD returns the SPMC version
-  specified in the SPMC manifest.
-- SP: the SPMC returns its own implemented version.
-- SPMC at S-EL1/S-EL2: the SPMD returns its own implemented version.
+- ``0``: Negotiate the version used by the caller at this FF-A instance.
+- ``1``: Discover a compatible implemented version without changing the
+  caller's negotiated version.
+- ``2``: Return the caller's currently negotiated version without changing it.
+  W1 should be zero for this query.
 
-The FF-A version can only be changed by calls to ``FFA_VERSION`` before other
-calls to other FF-A ABIs have been made. Calls to ``FFA_VERSION`` after
-subsequent ABI calls will fail.
+For negotiation and compatibility queries, Hafnium returns its implemented
+version if it is compatible with the requested version. Successful negotiation
+records the requested version as the caller's negotiated version.
+
+If the requested version is incompatible, Hafnium returns the closest
+implemented version without changing the negotiated version. Callers must
+therefore check compatibility before treating a negotiation response as successful.
+
+Negotiation is permitted only while the framework is not in use by the caller.
+If the requested version is compatible but the framework is in use, Hafnium
+returns the Null version (zero) and leaves the negotiated version unchanged.
+Compatibility and negotiated-version queries remain available while the
+framework is in use.
+
+For a partition, framework use includes mapped RX/TX buffers, bound
+notifications, pending framework notifications, outstanding memory-sharing
+transactions, and outstanding FF-A invocations other than the current
+``FFA_VERSION`` invocation. Once these conditions have been cleared, the
+partition can negotiate again. Note, Hafnium approximates outstanding
+invocations using the vCPUs' execution states. This means a RUNNING partition
+could prevent renegotiation even if it doesn't currently have any outstanding
+FF-A calls. The vCPU needs to enter the waiting state in this case.
+
+For the Hypervisor at the non-secure physical FF-A instance, framework use
+also accounts for state associated with its VMs: RX/TX buffers mapped in the
+SPMC, notification bindings between VMs and SPs, pending SPMC framework
+notifications, and memory shared or lent by VMs that has not been reclaimed.
+The Hypervisor's own mapped RX/TX buffers and outstanding FF-A invocations
+on other PEs also prevent negotiation.
+
+Hafnium returns ``SMCCC_INVALID_PARAMETER`` for invalid input flags or an
+unsupported query type, and for a requested version with bit 31 set in a
+negotiation or compatibility query.
+
+Normal-world calls pass through the SPMD, which handles version discovery
+and forwards negotiation as described in the TF-A SPM documentation.
 
 FFA_FEATURES
 ~~~~~~~~~~~~

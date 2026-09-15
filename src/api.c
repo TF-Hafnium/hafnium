@@ -2712,9 +2712,13 @@ static bool ffa_version_get_compatibility_response(
 }
 
 /**
- * Negotiate the FF-A version to be used for this FF-A instance.
+ * Handle FF-A version negotiation, compatibility discovery, or retrieval of
+ * the caller's negotiated version. Only a successful negotiation changes
+ * the caller's version.
  *
- * Returns Hafnium's version number (`FFA_VERSION_COMPILED`) on success.
+ * Negotiation and compatibility queries return Hafnium's version number
+ * (`FFA_VERSION_COMPILED`) for a compatible request. A negotiated-version
+ * query returns the caller's currently negotiated version.
  * Returns the closest implemented version if the requested version is
  * incompatible. Returns `SMCCC_INVALID_PARAMETER` if the version or input
  * flags are invalid. Returns the Null version if renegotiation is denied
