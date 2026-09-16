@@ -3160,6 +3160,78 @@ TEST(memory_sharing, ffa_memory_access_no_overflow)
 }
 
 /**
+ * Check that a first fragment shorter than the memory region transaction
+ * descriptor's fixed-size header is rejected, rather than having header
+ * fields (memory_access_desc_size, receivers_offset, receiver_count, ...)
+ * read from whatever previously occupied the copied-in buffer.
+ */
+TEST(memory_sharing, ffa_mem_send_fragment_shorter_than_header)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_value (*send_function[])(uint32_t, uint32_t) = {
+		ffa_mem_share,
+		ffa_mem_lend,
+		ffa_mem_donate,
+	};
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+			  mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(),
+			  service1_info->vm_id, constituents,
+			  ARRAY_SIZE(constituents), 0, 0,
+			  FFA_DATA_ACCESS_NOT_SPECIFIED,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
+		  0);
+
+	/*
+	 * Claim to send only 8 bytes as the (only) fragment, even though the
+	 * mailbox holds a full, otherwise-valid descriptor of `msg_size`
+	 * bytes: 8 is too short to hold even the fixed-size header, let alone
+	 * a receiver descriptor, and must be rejected before any header field
+	 * is read.
+	 */
+	for (unsigned int i = 0; i < ARRAY_SIZE(send_function); i++) {
+		ret = send_function[i](msg_size, 8);
+		EXPECT_EQ(ret.func, FFA_ERROR_32);
+		EXPECT_TRUE(ffa_error_code(ret) == FFA_INVALID_PARAMETERS);
+	}
+}
+
+/**
+ * Check that a retrieve request shorter than the memory region transaction
+ * descriptor's fixed-size header is rejected, rather than having header
+ * fields (receiver_count, ...) read from the per-CPU staging buffer, which is
+ * shared with, and may still hold data from, other partitions' earlier
+ * requests.
+ */
+TEST(memory_sharing, ffa_mem_retrieve_req_shorter_than_header)
+{
+	struct ffa_value ret;
+
+	set_up_mailbox();
+
+	/*
+	 * Retrieve requests cannot be fragmented, so the total length and the
+	 * fragment length are both 8 bytes: too short to hold even the
+	 * fixed-size header, and must be rejected before any header field is
+	 * read. No handle or prior share is needed, as the length check comes
+	 * first.
+	 */
+	ret = ffa_mem_retrieve_req(8, 8);
+	EXPECT_EQ(ret.func, FFA_ERROR_32);
+	EXPECT_TRUE(ffa_error_code(ret) == FFA_INVALID_PARAMETERS);
+}
+
+/**
  * Memory can't be shared if flags in the memory transaction description that
  * Must Be Zero, are not.
  */
