@@ -227,6 +227,7 @@ struct ffa_value arch_other_world_vm_configure_rxtx_unmap(
 	paddr_t pa_send_begin, paddr_t pa_send_end, paddr_t pa_recv_begin,
 	paddr_t pa_recv_end)
 {
+	struct ffa_value ret;
 	struct vm_locked other_world_locked = lock_other_world(vm_locked);
 
 	if (other_world_locked.vm == NULL) {
@@ -241,7 +242,8 @@ struct ffa_value arch_other_world_vm_configure_rxtx_unmap(
 			"%s: unable to remap send page to other world page "
 			"tables\n",
 			__func__);
-		return ffa_error(FFA_ABORTED);
+		ret = ffa_error(FFA_ABORTED);
+		goto out_unlock;
 	}
 
 	if (!vm_identity_map(other_world_locked, pa_recv_begin, pa_recv_end,
@@ -253,9 +255,13 @@ struct ffa_value arch_other_world_vm_configure_rxtx_unmap(
 			__func__);
 		CHECK(vm_unmap(other_world_locked, pa_send_begin, pa_send_end,
 			       local_page_pool));
-		return ffa_error(FFA_ABORTED);
+		ret = ffa_error(FFA_ABORTED);
+		goto out_unlock;
 	}
 
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+
+out_unlock:
 	unlock_other_world(vm_locked, other_world_locked);
-	return (struct ffa_value){.func = FFA_SUCCESS_32};
+	return ret;
 }
