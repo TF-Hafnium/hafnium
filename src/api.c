@@ -1975,8 +1975,17 @@ static ffa_id_t api_get_rxtx_description(struct vm *current_vm, ipaddr_t *send,
 			return HF_INVALID_VM_ID;
 		}
 
-		rx_region = ffa_endpoint_get_rx_memory_region(endpoint_desc);
-		tx_region = ffa_endpoint_get_tx_memory_region(endpoint_desc);
+		rx_region = ffa_endpoint_get_rx_memory_region(
+			endpoint_desc, vm_locked.vm->mailbox.buf_size);
+		tx_region = ffa_endpoint_get_tx_memory_region(
+			endpoint_desc, vm_locked.vm->mailbox.buf_size);
+		if (rx_region == NULL || tx_region == NULL) {
+			dlog_error(
+				"Invalid rx_offset/tx_offset in forwarded "
+				"RXTX description\n");
+			vm_unlock(&vm_locked);
+			return HF_INVALID_VM_ID;
+		}
 
 		owner_vm_id = endpoint_desc->endpoint_id;
 		*recv = ipa_init(rx_region->constituents[0].address);

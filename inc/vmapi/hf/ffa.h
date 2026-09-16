@@ -1938,16 +1938,55 @@ static inline bool ffa_endpoint_rx_tx_descriptor_offsets_valid(
 	return (desc->rx_offset % 8 == 0) && (desc->tx_offset % 8 == 0);
 }
 
-static inline struct ffa_composite_memory_region *
-ffa_endpoint_get_rx_memory_region(struct ffa_endpoint_rx_tx_descriptor *desc)
+/**
+ * Check that `offset` (relative to the start of a `desc_buffer_size`-byte
+ * buffer holding the endpoint descriptor) leaves enough room for the
+ * `ffa_composite_memory_region` header and its first constituent. 64-bit
+ * arithmetic avoids overflow, since `offset` is a caller-controlled
+ * `uint32_t` field with no other bound placed on it.
+ */
+static inline bool ffa_endpoint_memory_region_offset_valid(
+	uint32_t offset, size_t desc_buffer_size)
 {
+	uint64_t end = (uint64_t)offset +
+		       sizeof(struct ffa_composite_memory_region) +
+		       sizeof(struct ffa_memory_region_constituent);
+
+	return end <= desc_buffer_size;
+}
+
+/**
+ * Returns NULL if `desc->rx_offset` does not leave enough room, within a
+ * `desc_buffer_size`-byte buffer holding `desc`, for the RX
+ * `ffa_composite_memory_region` and its first constituent.
+ */
+static inline struct ffa_composite_memory_region *
+ffa_endpoint_get_rx_memory_region(struct ffa_endpoint_rx_tx_descriptor *desc,
+				  size_t desc_buffer_size)
+{
+	if (!ffa_endpoint_memory_region_offset_valid(desc->rx_offset,
+						     desc_buffer_size)) {
+		return NULL;
+	}
+
 	return (struct ffa_composite_memory_region *)((char *)desc +
 						      desc->rx_offset);
 }
 
+/**
+ * Returns NULL if `desc->tx_offset` does not leave enough room, within a
+ * `desc_buffer_size`-byte buffer holding `desc`, for the TX
+ * `ffa_composite_memory_region` and its first constituent.
+ */
 static inline struct ffa_composite_memory_region *
-ffa_endpoint_get_tx_memory_region(struct ffa_endpoint_rx_tx_descriptor *desc)
+ffa_endpoint_get_tx_memory_region(struct ffa_endpoint_rx_tx_descriptor *desc,
+				  size_t desc_buffer_size)
 {
+	if (!ffa_endpoint_memory_region_offset_valid(desc->tx_offset,
+						     desc_buffer_size)) {
+		return NULL;
+	}
+
 	return (struct ffa_composite_memory_region *)((char *)desc +
 						      desc->tx_offset);
 }
