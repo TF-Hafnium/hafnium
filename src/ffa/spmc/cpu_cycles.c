@@ -471,7 +471,15 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 		      cpu_index(current->cpu));
 	}
 
-	vcpu_unlock(&current_locked);
+	/*
+	 * Every branch above leaves `current` locked (any internal
+	 * unlock/re-lock cycle, e.g. in resume_halted_vcpu_upon_restart(),
+	 * lifecycle_sp_activation_complete(), or
+	 * ffa_cpu_cycles_msg_wait_intercept(), nets back to locked before
+	 * returning here). The caller, api_ffa_msg_wait(), is responsible for
+	 * the single matching vcpu_unlock() - do not unlock here too, or
+	 * `current`'s lock is released twice.
+	 */
 
 	return ret;
 }
