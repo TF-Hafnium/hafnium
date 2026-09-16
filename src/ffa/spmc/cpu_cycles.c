@@ -465,7 +465,10 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 		      cpu_index(current->cpu));
 	}
 
-	vcpu_unlock(&current_locked);
+	/*
+	 * Leave current locked for api_ffa_msg_wait(), which performs the
+	 * matching vcpu_unlock(). Unlocking here would release the lock twice.
+	 */
 
 	return ret;
 }
