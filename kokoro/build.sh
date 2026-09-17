@@ -36,7 +36,7 @@ run_tests ()
 	# Jenkins CI build: RUN_SPMC_ONLY=true  -> run SPMC tests
 	if [ "${RUN_SPMC_ONLY:-false}" == "true" ]
 	then
-		./kokoro/test_spmc.sh || exit 1
+		./kokoro/test_spmc.sh --run-to-completion || exit 1
 	fi
 
 	# Jenkins CI build: RUN_EL3_SPMC_ONLY=true  -> run EL3_SPMC tests
