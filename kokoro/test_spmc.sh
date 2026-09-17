@@ -20,8 +20,12 @@ execute_test() {
   shift
 
   command="${runner[@]} $@" # The rest of arguments are extra parameters
+  local test_status=0
+
+  # Capture the result before subsequent commands overwrite it.
+  ${command} || test_status=$?
+
   if [ "$CODE_COVERAGE" = true ];then
-    ${command} || true
     move_log_files ${WORKSPACE} trace_folder
     # If one of the parameters of the executed command was spmc or hypervisor
     # we need to extract the path to the binary to get the elf files
@@ -31,15 +35,19 @@ execute_test() {
     if [[ "${command}" =~ ^.+?--hypervisor[[:space:]]([^[:space:]]+?).+$ ]]; then
       append_elf_file "${WORKSPACE}/$(dirname ${BASH_REMATCH[1]})/hafnium.elf" $trace_folder
     fi
-  else
-    ${command}
   fi
 
+  if [ "$test_status" -ne 0 ]; then
+    # Preserve any failure while run-to-completion runs later setups.
+    TEST_RESULT=1
+    return "$test_status"
+  fi
 }
 
 USE_PARITY=false
 CODE_COVERAGE=false
 RUN_TO_COMPLETION=false
+TEST_RESULT=0
 WAIT_FOR_DEBUGGER=false
 HFTEST_LOG_LEVEL="INFO"  # Default log level
 SUITE=""
@@ -197,3 +205,6 @@ if [ "$CODE_COVERAGE" = true ]; then
   generate_header "${WORKSPACE}/report.html"
   echo "Finished code coverage..."
 fi
+
+# Return the accumulated result from all hftest invocations.
+exit "$TEST_RESULT"

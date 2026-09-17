@@ -51,6 +51,7 @@ export default {
         'fvp',
         'image',
         'changelog',
+        'kokoro',
 
         // submodules
         'reference',
