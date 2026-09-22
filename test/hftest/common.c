@@ -230,6 +230,8 @@ void hftest_command(struct fdt *fdt)
 	}
 
 	if (memiter_iseq(&command, "json")) {
+		/* Preconditions can inspect the same FDT used to run tests. */
+		hftest_get_context()->fdt = fdt;
 		hftest_json();
 		return;
 	}

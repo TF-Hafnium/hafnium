@@ -307,6 +307,15 @@ bool service1_is_mp_sp(void)
 	return service1_is_not_vm() && service1_is_mp();
 }
 
+bool service1_is_mp_sp_with_three_vcpus(void)
+{
+	struct mailbox_buffers mb = get_precondition_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	return !ffa_is_vm_id(service1_info->vm_id) &&
+	       service1_info->vcpu_count > 2;
+}
+
 /*
  * The following is a precondition function, for the current system set-up.
  * Check that service2 partition is an MP SP.
