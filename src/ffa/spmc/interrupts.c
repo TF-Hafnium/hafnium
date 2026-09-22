@@ -408,6 +408,7 @@ void ffa_interrupts_handle_secure_interrupt(struct vcpu *current,
 					    struct vcpu **next)
 {
 	struct vcpu *target_vcpu;
+	bool target_is_current;
 	struct vcpu_locked target_vcpu_locked =
 		(struct vcpu_locked){.vcpu = NULL};
 	struct vcpu_locked current_locked;
@@ -442,8 +443,9 @@ void ffa_interrupts_handle_secure_interrupt(struct vcpu *current,
 	}
 
 	target_vm_locked = vm_lock(target_vcpu->vm);
+	target_is_current = (target_vcpu == current);
 
-	if (target_vcpu == current) {
+	if (target_is_current) {
 		current_locked = vcpu_lock(current);
 		target_vcpu_locked = current_locked;
 	} else {
@@ -495,7 +497,7 @@ void ffa_interrupts_handle_secure_interrupt(struct vcpu *current,
 		}
 	}
 
-	if (target_vcpu_locked.vcpu != NULL) {
+	if (!target_is_current && target_vcpu_locked.vcpu != NULL) {
 		vcpu_unlock(&target_vcpu_locked);
 	}
 
