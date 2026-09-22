@@ -292,6 +292,50 @@ static void cpu_entry_send_ipi(uintptr_t arg)
 	arch_cpu_stop();
 }
 
+static void ipi_nwd_running_test(ffa_vcpu_index_t receiver_vcpu_id,
+				 const char *service_name,
+				 struct ipi_cpu_entry_args *sender_cpu_args)
+{
+	struct mailbox_buffers mb = sender_cpu_args->mb;
+	struct ffa_value ret;
+	ffa_id_t memory_receivers[] = {
+		sender_cpu_args->service_id,
+	};
+	uint32_t receivers_ipi_state_indexes[] = {0};
+
+	SERVICE_SELECT_MP(sender_cpu_args->service_id, service_name, mb.send,
+			  receiver_vcpu_id);
+
+	ret = ffa_run(sender_cpu_args->service_id, receiver_vcpu_id);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	hftest_ipi_state_share_page_and_init(
+		(uint64_t)interrupt_state_page, memory_receivers,
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers), &mb,
+		receiver_vcpu_id);
+
+	EXPECT_EQ(ffa_run(sender_cpu_args->service_id, receiver_vcpu_id).func,
+		  FFA_YIELD_32);
+
+	semaphore_init(&sender_cpu_args->work_done);
+
+	ASSERT_TRUE(hftest_cpu_start(
+		hftest_get_cpu_id(sender_cpu_args->vcpu_id),
+		hftest_get_secondary_ec_stack(sender_cpu_args->vcpu_id),
+		cpu_entry_send_ipi, (uintptr_t)sender_cpu_args));
+
+	/*
+	 * Resume the running SP vCPU so it transitions the state machine to
+	 * READY and then handles the incoming IPI while still running. This
+	 * exercises the self-targeted secure interrupt path where the target
+	 * vCPU is also the current vCPU in SPMC IRQ handling.
+	 */
+	ret = ffa_run(sender_cpu_args->service_id, receiver_vcpu_id);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	semaphore_wait(&sender_cpu_args->work_done);
+}
+
 /**
  * Test that Service1 can send IPI to vCPU0 from vCPU1, whilst vCPU0 is in
  * running state.
@@ -310,7 +354,6 @@ TEST_PRECONDITION(ipi, receive_ipi_running_vcpu, service1_is_mp_sp)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
-	struct ffa_value ret;
 	struct ipi_cpu_entry_args vcpu1_args = {
 		.service_id = service1_info->vm_id,
 		.vcpu_count = service1_info->vcpu_count,
@@ -318,42 +361,7 @@ TEST_PRECONDITION(ipi, receive_ipi_running_vcpu, service1_is_mp_sp)
 		.target_vcpu_ids = {0},
 		.target_vcpu_count = 1,
 		.mb = mb};
-	ffa_id_t memory_receivers[] = {
-		service1_info->vm_id,
-	};
-	uint32_t receivers_ipi_state_indexes[] = {0};
-
-	SERVICE_SELECT(service1_info->vm_id, "receive_ipi_running", mb.send);
-
-	ret = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
-
-	/* Share memory to setup the IPI state structure. */
-	hftest_ipi_state_share_page_and_init(
-		(uint64_t)interrupt_state_page, memory_receivers,
-		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers), &mb,
-		0);
-
-	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
-
-	/* Initialize semaphores to sync primary and secondary cores. */
-	semaphore_init(&vcpu1_args.work_done);
-
-	/* Bring-up the core that sends the IPI. */
-	ASSERT_TRUE(hftest_cpu_start(
-		hftest_get_cpu_id(vcpu1_args.vcpu_id),
-		hftest_get_secondary_ec_stack(vcpu1_args.vcpu_id),
-		cpu_entry_send_ipi, (uintptr_t)&vcpu1_args));
-
-	/*
-	 * Resumes service1 in target vCPU0 so it sets IPI state to READY and
-	 * handles IPI.
-	 */
-	ret = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(ret.func, FFA_YIELD_32);
-
-	/* Wait for secondary core to return before finishing the test. */
-	semaphore_wait(&vcpu1_args.work_done);
+	ipi_nwd_running_test(0, "receive_ipi_running", &vcpu1_args);
 }
 
 /*
@@ -374,7 +382,6 @@ TEST_PRECONDITION(ipi, receive_ipi_running_vcpu_with_secure_interrupts,
 {
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
-	struct ffa_value ret;
 	struct ipi_cpu_entry_args vcpu1_args = {
 		.service_id = service1_info->vm_id,
 		.vcpu_count = service1_info->vcpu_count,
@@ -382,43 +389,61 @@ TEST_PRECONDITION(ipi, receive_ipi_running_vcpu_with_secure_interrupts,
 		.target_vcpu_ids = {0},
 		.target_vcpu_count = 1,
 		.mb = mb};
-	ffa_id_t memory_receivers[] = {
-		service1_info->vm_id,
-	};
-	uint32_t receivers_ipi_state_indexes[] = {0};
+	ipi_nwd_running_test(0, "receive_ipi_running_with_secure_interrupts",
+			     &vcpu1_args);
+}
 
-	SERVICE_SELECT(service1_info->vm_id,
-		       "receive_ipi_running_with_secure_interrupts", mb.send);
+static void cpu_entry_receive_ipi_running(uintptr_t arg)
+{
+	struct ipi_cpu_entry_args *args =
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		(struct ipi_cpu_entry_args *)arg;
+	struct ipi_cpu_entry_args sender_vcpu_args = {
+		.service_id = args->service_id,
+		.vcpu_count = args->vcpu_count,
+		.vcpu_id = args->vcpu_id + 1,
+		.target_vcpu_ids = {0},
+		.target_vcpu_count = args->target_vcpu_count,
+		.mb = args->mb};
 
-	ret = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+	assert(args->vcpu_id < MAX_CPUS - 1);
+	assert(args->target_vcpu_count < MAX_CPUS);
 
-	/* Share memory to setup the IPI state structure. */
-	hftest_ipi_state_share_page_and_init(
-		(uint64_t)interrupt_state_page, memory_receivers,
-		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers), &mb,
-		0);
+	for (uint32_t i = 0; i < args->target_vcpu_count; i++) {
+		sender_vcpu_args.target_vcpu_ids[i] = args->target_vcpu_ids[i];
+	}
 
-	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+	ipi_nwd_running_test(args->vcpu_id, "receive_ipi_running",
+			     &sender_vcpu_args);
 
-	/* Initialize semaphores to sync primary and secondary cores. */
-	semaphore_init(&vcpu1_args.work_done);
+	semaphore_signal(&args->work_done);
+	arch_cpu_stop();
+}
 
-	/* Bring-up the core that sends the IPI. */
+TEST_PRECONDITION(ipi, receive_ipi_running_vcpu_non_primary_cpu,
+		  service1_is_mp_sp)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ipi_cpu_entry_args receiver_vcpu_args = {
+		.service_id = service1_info->vm_id,
+		.vcpu_count = service1_info->vcpu_count,
+		.vcpu_id = 1,
+		.target_vcpu_ids = {1},
+		.target_vcpu_count = 1,
+		.mb = mb};
+
+	ASSERT_TRUE(MAX_CPUS > 2);
+	ASSERT_GT(service1_info->vcpu_count, 2);
+	semaphore_init(&receiver_vcpu_args.work_done);
+
 	ASSERT_TRUE(hftest_cpu_start(
-		hftest_get_cpu_id(vcpu1_args.vcpu_id),
-		hftest_get_secondary_ec_stack(vcpu1_args.vcpu_id),
-		cpu_entry_send_ipi, (uintptr_t)&vcpu1_args));
+		hftest_get_cpu_id(receiver_vcpu_args.vcpu_id),
+		hftest_get_secondary_ec_stack(receiver_vcpu_args.vcpu_id),
+		cpu_entry_receive_ipi_running, (uintptr_t)&receiver_vcpu_args));
 
-	/*
-	 * Resumes service1 in target vCPU0 so it sets IPI state to READY and
-	 * handles IPI.
-	 */
-	ret = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(ret.func, FFA_YIELD_32);
-
-	/* Wait for secondary core to return before finishing the test. */
-	semaphore_wait(&vcpu1_args.work_done);
+	semaphore_wait(&receiver_vcpu_args.work_done);
+	hftest_ipi_state_reset_all();
 }
 
 /**
