@@ -129,9 +129,9 @@ FVP model invocation
 
 .. note::
 
-   Hafnium testing (CI and local) is validated against Arm FVP release FM-11.31.
+   Hafnium testing (CI and local) is validated against Arm FVP release FM-11.32.
    Use the Base RevC AEMvA FVP model from this release
-   (e.g. FVP_Base_RevC_AEMvA_11.31_28_Linux_x86), available from `Arm's website`_
+   (e.g. FVP_Base_RevC_AEMvA_11.32_19_Linux_x86), available from `Arm's website`_
 
 The FVP command line needs the following options to exercise the S-EL2 SPMC:
 
