@@ -482,7 +482,7 @@ static struct ffa_value constituents_get_mode(
 			 * Ensure that all constituents are mapped with the same
 			 * mode.
 			 */
-			if (i == 0) {
+			if (i == 0 && j == 0) {
 				*orig_mode = current_mode;
 			} else if (current_mode != *orig_mode) {
 				dlog_verbose(
