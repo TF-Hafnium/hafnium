@@ -10,7 +10,7 @@ CI runs are done using Ubuntu 22.04 LTS (64-bit).
 Toolchain
 ---------
 
-The clang-20 toolchain is recommended for building Hafnium and the test
+The clang-22 toolchain is recommended for building Hafnium and the test
 infrastructure. On Ubuntu, the toolchain can be installed from the LLVM apt
 repository (https://apt.llvm.org/).
 

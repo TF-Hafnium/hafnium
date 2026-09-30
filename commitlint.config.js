@@ -52,6 +52,7 @@ export default {
         'image',
         'changelog',
         'kokoro',
+        'clang',
 
         // submodules
         'reference',
