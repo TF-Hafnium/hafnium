@@ -38,7 +38,7 @@ RUN apt-get install -y \
 # Install Clang and LLVM.
 # Use the packages from LLVM's repository rather than the default Ubuntu
 # repository so we can control the exact version.
-ENV LLVM_VERSION=20
+ENV LLVM_VERSION=22
 RUN wget https://apt.llvm.org/llvm-snapshot.gpg.key -O /etc/apt/keyrings/llvm-snapshot.key
 RUN echo "deb [signed-by=/etc/apt/keyrings/llvm-snapshot.key] http://apt.llvm.org/noble/ llvm-toolchain-noble-$LLVM_VERSION main" > /etc/apt/sources.list.d/llvm.list
 RUN echo "deb-src [signed-by=/etc/apt/keyrings/llvm-snapshot.key] http://apt.llvm.org/noble/ llvm-toolchain-noble-$LLVM_VERSION main" >> /etc/apt/sources.list.d/llvm.list
@@ -52,7 +52,7 @@ RUN apt-get install -y \
 		lld-$LLVM_VERSION \
 		libc++-$LLVM_VERSION-dev
 
-# LLVM binaries are present in `/usr/bin` as `clang-20`, `clang-tidy-20`, etc.
+# LLVM binaries are present in `/usr/bin` as `clang-22`, `clang-tidy-22`, etc.
 # But we want them to be available as `clang`, `clang-tidy`, etc.
 # So we create symlinks for them.
 RUN for f in /usr/lib/llvm-$LLVM_VERSION/bin/*; do ln -s "$f" /usr/local/bin; done
