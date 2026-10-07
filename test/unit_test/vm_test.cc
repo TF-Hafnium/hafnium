@@ -498,7 +498,7 @@ TEST_F(vm, vm_notifications_info_get_full_global)
 	vm_unlock(&current_vm_locked);
 }
 
-TEST_F(vm, vm_notifications_info_get_from_framework)
+TEST_F(vm, vm_notifications_info_get_from_framework_namespaces)
 {
 	struct vm_locked vm_locked = vm_lock(vm_find_index(0));
 	uint16_t ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
@@ -506,8 +506,8 @@ TEST_F(vm, vm_notifications_info_get_from_framework)
 	uint32_t lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
 	uint32_t lists_count = 0;
 
-	vm_notifications_framework_set_pending(
-		vm_locked, ffa_notification_bitmap_single(0));
+	vm_notifications_framework_set_rx_buffer_full(vm_locked, false);
+	vm_notifications_framework_set_rx_buffer_full(vm_locked, true);
 
 	/* Get notifications info for the given notifications. */
 	vm_notifications_info_get(vm_locked, ids, &ids_count, lists_sizes,
@@ -521,7 +521,7 @@ TEST_F(vm, vm_notifications_info_get_from_framework)
 
 	EXPECT_EQ(ffa_notification_bitmap_low64(
 			  vm_notifications_framework_get_pending(vm_locked)),
-		  0x1U);
+		  UINT64_C(0x0000000100000001));
 
 	vm_unlock(&vm_locked);
 }

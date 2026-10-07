@@ -1451,7 +1451,11 @@ static_assert(FFA_NOTIFICATION_WORDS == 6U,
 #define FFA_NOTIFICATION_MASK_IN_WORD(id) \
 	(UINT64_C(1) << FFA_NOTIFICATION_WORD_OFFSET(id))
 
-#define FFA_NOTIFICATION_SPM_BUFFER_FULL_ID 0U
+/* RX-buffer-full ID local to either framework notification namespace. */
+#define FFA_NOTIFICATION_RX_BUFFER_FULL_ID 0U
+
+/* RX-buffer-full bit positions in the legacy combined framework bitmap. */
+#define FFA_NOTIFICATION_SPM_BUFFER_FULL_ID FFA_NOTIFICATION_RX_BUFFER_FULL_ID
 #define FFA_NOTIFICATION_HYP_BUFFER_FULL_ID 32U
 
 typedef struct ffa_notifications_bitmap {

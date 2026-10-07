@@ -680,7 +680,10 @@ bool vm_are_global_notifications_pending(struct vm_locked vm_locked)
 bool vm_are_fwk_notifications_pending(struct vm_locked vm_locked)
 {
 	return !ffa_notification_bitmap_is_zero(
-		vm_locked.vm->notifications.framework.pending);
+		       vm_locked.vm->notifications.framework_from_spm
+			       .pending) ||
+	       !ffa_notification_bitmap_is_zero(
+		       vm_locked.vm->notifications.framework_from_hyp.pending);
 }
 
 bool vm_are_notifications_enabled(struct vm *vm)
@@ -878,14 +881,19 @@ void vm_notifications_partition_set_pending(
 /**
  * Set pending framework notifications.
  */
-void vm_notifications_framework_set_pending(
-	struct vm_locked vm_locked, ffa_notifications_bitmap_t notifications)
+void vm_notifications_framework_set_rx_buffer_full(struct vm_locked vm_locked,
+						   bool is_from_hyp)
 {
+	struct notifications_state *state;
+
+	ffa_notifications_bitmap_t rx_buffer_full =
+		ffa_notification_bitmap_single(
+			FFA_NOTIFICATION_RX_BUFFER_FULL_ID);
 	CHECK(vm_locked.vm != NULL);
-	assert(is_ffa_spm_buffer_full_notification(notifications) ||
-	       is_ffa_hyp_buffer_full_notification(notifications));
-	vm_notifications_state_set(&vm_locked.vm->notifications.framework,
-				   notifications);
+
+	state = is_from_hyp ? &vm_locked.vm->notifications.framework_from_hyp
+			    : &vm_locked.vm->notifications.framework_from_spm;
+	vm_notifications_state_set(state, rx_buffer_full);
 }
 
 static ffa_notifications_bitmap_t vm_notifications_state_get_pending(
@@ -942,15 +950,26 @@ ffa_notifications_bitmap_t vm_notifications_partition_get_pending(
 ffa_notifications_bitmap_t vm_notifications_framework_get_pending(
 	struct vm_locked vm_locked)
 {
-	struct vm *vm = vm_locked.vm;
-	ffa_notifications_bitmap_t framework;
+	ffa_notifications_bitmap_t from_spm;
+	ffa_notifications_bitmap_t from_hyp;
+	uint64_t legacy_framework;
 
-	assert(vm != NULL);
+	assert(vm_locked.vm != NULL);
 
-	framework = vm_notifications_state_get_pending(
-		&vm->notifications.framework);
+	from_spm = vm_notifications_state_get_pending(
+		&vm_locked.vm->notifications.framework_from_spm);
+	from_hyp = vm_notifications_state_get_pending(
+		&vm_locked.vm->notifications.framework_from_hyp);
 
-	return framework;
+	/*
+	 * FFA_NOTIFICATION_GET returns the SPMC namespace in bits [31:0]
+	 * and the Hypervisor namespace in bits [63:32].
+	 */
+	legacy_framework = ffa_notification_bitmap_low32(from_spm);
+	legacy_framework |= (uint64_t)ffa_notification_bitmap_low32(from_hyp)
+			    << 32U;
+
+	return ffa_notification_bitmap_from_legacy_u64(legacy_framework);
 }
 
 static bool vm_insert_notification_info_list(
@@ -1047,6 +1066,51 @@ static bool vm_notifications_state_info_get(
 		state->info_get_retrieved, pending_not_retrieved);
 
 	vm_notifications_info_get_retrieved_count_add(pending_not_retrieved);
+
+	return true;
+}
+
+/**
+ * Report an endpoint once when either framework namespace has a pending
+ * notification, while tracking INFO_GET state independently per namespace.
+ */
+static bool vm_notifications_framework_info_get(
+	struct vm_locked vm_locked, uint16_t *ids, uint32_t *ids_count,
+	uint32_t *lists_sizes, uint32_t *lists_count,
+	const uint32_t ids_max_count,
+	enum notifications_info_get_state *info_get_state)
+{
+	struct notifications_state *from_spm =
+		&vm_locked.vm->notifications.framework_from_spm;
+	struct notifications_state *from_hyp =
+		&vm_locked.vm->notifications.framework_from_hyp;
+	ffa_notifications_bitmap_t spm_pending_not_retrieved =
+		ffa_notification_bitmap_exclude(from_spm->pending,
+						from_spm->info_get_retrieved);
+	ffa_notifications_bitmap_t hyp_pending_not_retrieved =
+		ffa_notification_bitmap_exclude(from_hyp->pending,
+						from_hyp->info_get_retrieved);
+
+	if (ffa_notification_bitmap_is_zero(spm_pending_not_retrieved) &&
+	    ffa_notification_bitmap_is_zero(hyp_pending_not_retrieved)) {
+		return false;
+	}
+
+	if (!vm_insert_notification_info_list(
+		    vm_locked.vm->id, false, 0, ids, ids_count, lists_sizes,
+		    lists_count, ids_max_count, info_get_state)) {
+		return false;
+	}
+
+	from_spm->info_get_retrieved = ffa_notification_bitmap_or(
+		from_spm->info_get_retrieved, spm_pending_not_retrieved);
+	from_hyp->info_get_retrieved = ffa_notification_bitmap_or(
+		from_hyp->info_get_retrieved, hyp_pending_not_retrieved);
+
+	vm_notifications_info_get_retrieved_count_add(
+		spm_pending_not_retrieved);
+	vm_notifications_info_get_retrieved_count_add(
+		hyp_pending_not_retrieved);
 
 	return true;
 }
@@ -1156,11 +1220,10 @@ bool vm_notifications_info_get(struct vm_locked vm_locked, uint16_t *ids,
 {
 	enum notifications_info_get_state current_state = INIT;
 
-	/* Get info of pending notifications from the framework. */
-	vm_notifications_state_info_get(&vm_locked.vm->notifications.framework,
-					vm_locked.vm->id, ids, ids_count,
-					lists_sizes, lists_count, ids_max_count,
-					&current_state);
+	/* Get info of pending notifications from either framework namespace. */
+	vm_notifications_framework_info_get(vm_locked, ids, ids_count,
+					    lists_sizes, lists_count,
+					    ids_max_count, &current_state);
 
 	/* Get info of pending notifications from SPs. */
 	vm_notifications_info_get_pending(vm_locked, false, ids, ids_count,

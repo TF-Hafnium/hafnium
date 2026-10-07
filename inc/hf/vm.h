@@ -236,7 +236,13 @@ struct vm {
 		 */
 		struct notifications from_vm;
 		struct notifications from_sp;
-		struct notifications_state framework;
+		/**
+		 * Keep the framework notification state for the SPMC and
+		 * the Hypervisor namespaces independent.
+		 * Notification IDs are local to each namespace.
+		 */
+		struct notifications_state framework_from_spm;
+		struct notifications_state framework_from_hyp;
 		bool enabled;
 	} notifications;
 
@@ -411,8 +417,18 @@ void vm_notifications_partition_set_pending(
 	ffa_notifications_bitmap_t notifications);
 ffa_notifications_bitmap_t vm_notifications_partition_get_pending(
 	struct vm_locked vm_locked, bool is_from_vm);
-void vm_notifications_framework_set_pending(
-	struct vm_locked vm_locked, ffa_notifications_bitmap_t notifications);
+
+/**
+ * Marks the RX-buffer-full framework notification pending.
+ *
+ * If `is_from_hyp` is true, the Hypervisor framework namespace is selected.
+ * Otherwise, the SPMC framework namespace is selected. The notification ID is
+ * local to the selected namespace; this helper does not accept bit positions
+ * from the legacy combined framework bitmap.
+ */
+void vm_notifications_framework_set_rx_buffer_full(struct vm_locked vm_locked,
+						   bool is_from_hyp);
+
 ffa_notifications_bitmap_t vm_notifications_framework_get_pending(
 	struct vm_locked vm_locked);
 void vm_notifications_info_get_pending(

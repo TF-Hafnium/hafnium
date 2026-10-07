@@ -2423,15 +2423,10 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_id, uint32_t flags,
 	 */
 	if (ffa_is_vm_id(receiver_locked.vm->id) ||
 	    vm_are_notifications_enabled(receiver_locked.vm)) {
-		ffa_notifications_bitmap_t rx_buffer_full =
-			ffa_is_vm_id(header_sender_id)
-				? ffa_notification_bitmap_single(
-					  FFA_NOTIFICATION_HYP_BUFFER_FULL_ID)
-				: ffa_notification_bitmap_single(
-					  FFA_NOTIFICATION_SPM_BUFFER_FULL_ID);
+		bool is_from_hyp = ffa_is_vm_id(header_sender_id);
 
-		vm_notifications_framework_set_pending(receiver_locked,
-						       rx_buffer_full);
+		vm_notifications_framework_set_rx_buffer_full(receiver_locked,
+							      is_from_hyp);
 
 		if ((FFA_NOTIFICATIONS_FLAG_DELAY_SRI & flags) == 0) {
 			dlog_verbose("SRI was NOT delayed. vcpu: %u!\n",
