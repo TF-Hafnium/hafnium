@@ -26,6 +26,11 @@
 	xlat-granule = <0>; /* 4KiB */
 	boot-order = <3>;
 	notification-support; /* Receipt of notifications. */
+	/*
+	 * Notification count properties are intentionally omitted.
+	 * SP3 therefore keeps the default 64-ID allocation used by the
+	 * allocation-boundary test.
+	 */
 	ns-interrupts-action = <0>; /* Non secure interrupts are queued. */
 	other-s-interrupts-action = <0>; /* Other S-Interrupts are queued. */
 	gp-register-num = <0>;

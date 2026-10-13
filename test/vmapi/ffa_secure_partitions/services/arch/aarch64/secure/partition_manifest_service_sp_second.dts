@@ -24,6 +24,12 @@
 	ns-interrupts-action = <2>; /* Non secure interrupts are signaled. */
 	boot-order = <2>;
 	notification-support; /* Receipt of notifications. */
+	/*
+	 * SP2 receives notifications from both VMs and SPs in the Notification2
+	 * tests. Allocate the full range in both independent categories.
+	 */
+	vm-notification-count = <384>;
+	sp-notification-count = <384>;
 	gp-register-num = <0>;
 	power-management-messages = <1>; /* Support CPU_OFF power management message. */
 

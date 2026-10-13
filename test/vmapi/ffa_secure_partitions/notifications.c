@@ -445,6 +445,92 @@ TEST(ffa_notifications2, signaling_from_sp_to_sp)
 }
 
 /**
+ * Validate enforcement of a receiver's allocated notification count.
+ *
+ * SP3 enables notifications but intentionally omits the notification-count
+ * properties from its manifest. It therefore receives the legacy allocation
+ * of 64 VM notification IDs: IDs 0-63 are valid and ID 64 is the first ID
+ * outside the allocation.
+ *
+ * First complete a notification lifecycle using ID 63 to prove the upper
+ * valid boundary works. Then pass ID 64 independently to BIND2, SET2, GET2
+ * and UNBIND2. Each ABI must reject the out-of-allocation ID with
+ * FFA_INVALID_PARAMETERS.
+ */
+TEST(ffa_notifications2, enforces_default_receiver_allocation)
+{
+	const struct ffa_uuid receiver_uuid = SERVICE3;
+	const ffa_id_t sender = hf_vm_get_id();
+	const ffa_id_t receiver = SP_ID(3);
+	ffa_notifications_bitmap_t empty;
+	ffa_notifications_bitmap_t last_allocated =
+		ffa_notification_bitmap_single(63);
+	ffa_notifications_bitmap_t first_unallocated =
+		ffa_notification_bitmap_single(64);
+	struct ffa_value res;
+	ffa_notification_bitmap_init(&empty);
+
+	/*
+	 * Exercise the last allocated ID through a complete VM-to-SP flow:
+	 * SP3 binds it, the primary VM sets it, SP3 retrieves it, and SP3
+	 * finally unbinds it.
+	 */
+	res = sp_notif_bind2_cmd_send(sender, receiver, &receiver_uuid, sender,
+				      0U, last_allocated);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+	EXPECT_EQ(sp_resp2(res), SP_SUCCESS);
+
+	res = ffa_notification_set2(sender, receiver, 0U, last_allocated);
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+
+	/* Confirm that the receiver is reported as having work pending. */
+	res = ffa_notification_info_get();
+	EXPECT_EQ(res.func, FFA_SUCCESS_64);
+
+	res = sp_notif_get2_cmd_send(sender, receiver, &receiver_uuid, 0U,
+				     FFA_NOTIFICATION_FLAG_BITMAP_VM, empty);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+	EXPECT_EQ(sp_resp2(res), SP_SUCCESS);
+	EXPECT_TRUE(ffa_notification_bitmap_equal(sp_notif_get2_bitmap(res),
+						  last_allocated));
+
+	res = sp_notif_unbind2_cmd_send(sender, receiver, &receiver_uuid,
+					sender, last_allocated);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+	EXPECT_EQ(sp_resp2(res), SP_SUCCESS);
+
+	/* BIND2 must reject the first ID outside SP3's VM allocation. */
+	res = sp_notif_bind2_cmd_send(sender, receiver, &receiver_uuid, sender,
+				      0U, first_unallocated);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+	EXPECT_EQ(sp_resp2(res), SP_ERROR);
+	EXPECT_EQ((uint32_t)res.arg5, FFA_INVALID_PARAMETERS);
+
+	/*
+	 * SET2 must reject the same ID based on the receiver's allocation,
+	 * independently of whether that ID has a valid binding.
+	 */
+	res = ffa_notification_set2(sender, receiver, 0U, first_unallocated);
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
+
+	/* GET2 must reject a VM-notification mask containing an unallocated ID.
+	 */
+	res = sp_notif_get2_cmd_send(sender, receiver, &receiver_uuid, 0U,
+				     FFA_NOTIFICATION_FLAG_BITMAP_VM,
+				     first_unallocated);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+	EXPECT_EQ(sp_resp2(res), SP_ERROR);
+	EXPECT_EQ((uint32_t)res.arg5, FFA_INVALID_PARAMETERS);
+
+	/* UNBIND2 applies the same allocation boundary as BIND2. */
+	res = sp_notif_unbind2_cmd_send(sender, receiver, &receiver_uuid,
+					sender, first_unallocated);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+	EXPECT_EQ(sp_resp2(res), SP_ERROR);
+	EXPECT_EQ((uint32_t)res.arg5, FFA_INVALID_PARAMETERS);
+}
+
+/**
  * Validate notification-count discovery at the Non-secure virtual FF-A
  * interface.
  *

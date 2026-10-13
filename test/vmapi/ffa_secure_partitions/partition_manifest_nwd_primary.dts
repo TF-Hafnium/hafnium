@@ -22,6 +22,11 @@
 	xlat-granule = <0>; /* 4KiB */
 	ns-interrupts-action = <2>; /* Non secure interrupts are signaled. */
 	notification-support; /* Receipt of notifications. */
+	/*
+	 * The primary VM receives notifications sent by SPs. Request the full
+	 * range so the SP-to-VM Notification2 test can exercise ID 383.
+	 */
+	sp-notification-count = <384>;
 
 	services {
 		compatible = "arm,ffa-manifest-services";
