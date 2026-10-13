@@ -636,10 +636,35 @@ void vm_notifications_init(struct vm *vm)
 	struct notifications *from_sp = &vm->notifications.from_sp;
 	struct notifications *from_vm = &vm->notifications.from_vm;
 
+	from_sp->allocated_count = FFA_NOTIFICATION_COUNT_BASE;
+	from_vm->allocated_count = FFA_NOTIFICATION_COUNT_BASE;
+
 	for (uint32_t i = 0U; i < MAX_FFA_NOTIFICATIONS; ++i) {
 		from_sp->bindings_sender_id[i] = HF_INVALID_VM_ID;
 		from_vm->bindings_sender_id[i] = HF_INVALID_VM_ID;
 	}
+}
+
+uint16_t vm_notifications_get_allocated_count(struct vm_locked vm_locked,
+					      bool is_from_vm)
+{
+	CHECK(vm_locked.vm != NULL);
+
+	return vm_get_notifications(vm_locked, is_from_vm)->allocated_count;
+}
+
+void vm_notifications_set_allocated_count(struct vm_locked vm_locked,
+					  bool is_from_vm,
+					  uint16_t notification_count)
+{
+	struct notifications *notifications;
+
+	CHECK(vm_locked.vm != NULL);
+	CHECK(notification_count >= FFA_NOTIFICATION_COUNT_BASE);
+	CHECK(notification_count <= MAX_FFA_NOTIFICATIONS);
+
+	notifications = vm_get_notifications(vm_locked, is_from_vm);
+	notifications->allocated_count = notification_count;
 }
 
 /**

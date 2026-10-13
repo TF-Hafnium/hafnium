@@ -280,6 +280,10 @@ struct ffa_partition_manifest {
 	bool me_signal_virq;
 	/** optional - receipt of notifications. */
 	bool notification_support;
+	/** Optional requested VM notification count. Defaults to 64. */
+	uint16_t requested_vm_notification_count;
+	/** Optional requested SP notification count. Defaults to 64. */
+	uint16_t requested_sp_notification_count;
 
 	/** optional - request the scheduler cycles to handle interrupts. */
 	struct sri_interrupts_policy sri_policy;

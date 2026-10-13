@@ -112,6 +112,9 @@ struct notifications_state {
 };
 
 struct notifications {
+	/** Number of notification IDs allocated to this bitmap. */
+	uint16_t allocated_count;
+
 	/**
 	 * The following array maps the notifications to the bound FF-A
 	 * endpoint.
@@ -396,6 +399,11 @@ bool vm_iommu_mm_identity_map(struct vm_locked vm_locked, ipaddr_t begin,
 			      uint8_t dma_device_id);
 
 void vm_notifications_init(struct vm *vm);
+uint16_t vm_notifications_get_allocated_count(struct vm_locked vm_locked,
+					      bool is_from_vm);
+void vm_notifications_set_allocated_count(struct vm_locked vm_locked,
+					  bool is_from_vm,
+					  uint16_t notification_count);
 bool vm_mailbox_state_busy(struct vm_locked vm_locked);
 bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
 				  ffa_notifications_bitmap_t notifications);

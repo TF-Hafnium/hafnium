@@ -236,6 +236,13 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 		vm_locked.vm->notifications.enabled =
 			manifest_vm->partition.notification_support;
 
+		vm_notifications_set_allocated_count(
+			vm_locked, true,
+			manifest_vm->partition.requested_vm_notification_count);
+		vm_notifications_set_allocated_count(
+			vm_locked, false,
+			manifest_vm->partition.requested_sp_notification_count);
+
 		vm_locked.vm->vm_availability_messages.vm_created =
 			manifest_vm->partition.vm_availability_messages
 				.vm_created;

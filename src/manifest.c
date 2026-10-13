@@ -1343,8 +1343,46 @@ enum manifest_return_code parse_ffa_manifest(
 
 	TRY(read_bool(&root, "notification-support",
 		      &vm->partition.notification_support));
+
+	/*
+	 * FF-A allocates the legacy 64 notification IDs when either extended
+	 * notification-count property is absent.
+	 */
+	vm->partition.requested_vm_notification_count =
+		FFA_NOTIFICATION_COUNT_BASE;
+	vm->partition.requested_sp_notification_count =
+		FFA_NOTIFICATION_COUNT_BASE;
 	if (vm->partition.notification_support) {
+		TRY(read_optional_uint16(
+			&root, "vm-notification-count",
+			FFA_NOTIFICATION_COUNT_BASE,
+			&vm->partition.requested_vm_notification_count));
+		TRY(read_optional_uint16(
+			&root, "sp-notification-count",
+			FFA_NOTIFICATION_COUNT_BASE,
+			&vm->partition.requested_sp_notification_count));
+
+		if (vm->partition.requested_vm_notification_count <
+			    FFA_NOTIFICATION_COUNT_BASE ||
+		    vm->partition.requested_vm_notification_count >
+			    MAX_FFA_NOTIFICATIONS ||
+		    vm->partition.requested_sp_notification_count <
+			    FFA_NOTIFICATION_COUNT_BASE ||
+		    vm->partition.requested_sp_notification_count >
+			    MAX_FFA_NOTIFICATIONS ||
+		    (vm->partition.ffa_version < FFA_VERSION_1_3 &&
+		     (vm->partition.requested_vm_notification_count >
+			      FFA_NOTIFICATION_COUNT_BASE ||
+		      vm->partition.requested_sp_notification_count >
+			      FFA_NOTIFICATION_COUNT_BASE))) {
+			dlog_error("Invalid notification count requested.\n");
+			return MANIFEST_ERROR_ILLEGAL_NOTIFICATION_COUNT;
+		}
 		dlog_verbose("  Notifications Receipt Supported\n");
+		dlog_verbose("    VM notification count: %u\n",
+			     vm->partition.requested_vm_notification_count);
+		dlog_verbose("    SP notification count: %u\n",
+			     vm->partition.requested_sp_notification_count);
 	}
 
 	TRY(read_optional_uint8(
@@ -1868,6 +1906,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Illegal value specified for the field: SRI Policy";
 	case MANIFEST_ERROR_SRI_POLICY_NOT_SUPPORTED:
 		return "S-EL0 Partitions do not support the SRI trigger policy";
+	case MANIFEST_ERROR_ILLEGAL_NOTIFICATION_COUNT:
+		return "Notification count must be between 64 and 384";
 	case MANIFEST_ERROR_INTERRUPT_ID_NOT_IN_LIST:
 		return "Interrupt ID is not in the list of interrupts";
 	case MANIFEST_ERROR_ILLEGAL_OTHER_S_INT_ACTION:
