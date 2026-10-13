@@ -729,6 +729,52 @@ TEST_F(vm, ffa_invocation_outstanding_vcpu_states)
 	vm_unlock(&test_vm_locked);
 }
 
+/** Verify independent allocation limits for VM and SP notification sources. */
+TEST_F(vm, vm_notifications_validates_allocated_counts)
+{
+	struct vm_locked vm_locked = vm_lock(vm_find_index(0));
+	const bool is_from_vm = true;
+	const bool is_from_sp = false;
+	ffa_notifications_bitmap_t vm_last =
+		ffa_notification_bitmap_single(127);
+	ffa_notifications_bitmap_t vm_first_outside =
+		ffa_notification_bitmap_single(128);
+	ffa_notifications_bitmap_t sp_last =
+		ffa_notification_bitmap_single(383);
+
+	/* Both notification categories use the legacy allocation by default. */
+	EXPECT_EQ(vm_notifications_get_allocated_count(vm_locked, is_from_vm),
+		  FFA_NOTIFICATION_COUNT_BASE);
+	EXPECT_EQ(vm_notifications_get_allocated_count(vm_locked, is_from_sp),
+		  FFA_NOTIFICATION_COUNT_BASE);
+
+	vm_notifications_set_allocated_count(vm_locked, is_from_vm, 128U);
+	vm_notifications_set_allocated_count(vm_locked, is_from_sp,
+					     MAX_FFA_NOTIFICATIONS);
+	EXPECT_EQ(vm_notifications_get_allocated_count(vm_locked, is_from_vm),
+		  128U);
+	EXPECT_EQ(vm_notifications_get_allocated_count(vm_locked, is_from_sp),
+		  MAX_FFA_NOTIFICATIONS);
+
+	EXPECT_TRUE(vm_notifications_bitmap_is_within_allocated_count(
+		vm_locked, is_from_vm, vm_last));
+	EXPECT_FALSE(vm_notifications_bitmap_is_within_allocated_count(
+		vm_locked, is_from_vm, vm_first_outside));
+
+	/* The same ID is valid for the independently allocated SP category. */
+	EXPECT_TRUE(vm_notifications_bitmap_is_within_allocated_count(
+		vm_locked, is_from_sp, vm_first_outside));
+	EXPECT_TRUE(vm_notifications_bitmap_is_within_allocated_count(
+		vm_locked, is_from_sp, sp_last));
+
+	/* Restore shared VM state for subsequent tests. */
+	vm_notifications_set_allocated_count(vm_locked, is_from_vm,
+					     FFA_NOTIFICATION_COUNT_BASE);
+	vm_notifications_set_allocated_count(vm_locked, is_from_sp,
+					     FFA_NOTIFICATION_COUNT_BASE);
+	vm_unlock(&vm_locked);
+}
+
 /**
  * Verify that legacy GET retrieves IDs 0-63 without clearing extended
  * notification IDs.

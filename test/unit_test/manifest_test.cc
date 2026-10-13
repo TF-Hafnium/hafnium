@@ -2964,4 +2964,96 @@ TEST_F(manifest, validate_sp_live_activation_canonical_image_uuid)
 		ElementsAre(0x00112233, 0x44556677, 0x8899aabb, 0xccddeeff));
 }
 
+TEST_F(manifest, ffa_notification_counts_default_to_legacy_count)
+{
+	struct_manifest *m;
+	struct manifest_vm *vm;
+
+	/* clang-format off */
+     std::vector<char> dtb = ManifestDtBuilder()
+             .FfaValidManifest()
+             .BooleanProperty("notification-support")
+             .Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+	vm = &m->vm[0];
+	EXPECT_EQ(vm->partition.requested_vm_notification_count,
+		  FFA_NOTIFICATION_COUNT_BASE);
+	EXPECT_EQ(vm->partition.requested_sp_notification_count,
+		  FFA_NOTIFICATION_COUNT_BASE);
+	manifest_dealloc();
+}
+
+TEST_F(manifest, ffa_extended_notification_counts_are_parsed)
+{
+	struct_manifest *m;
+	struct manifest_vm *vm;
+	/* clang-format off */
+     std::vector<char> dtb = ManifestDtBuilder()
+             .FfaValidManifest(FFA_VERSION_1_3)
+             .BooleanProperty("notification-support")
+             .IntegerProperty("vm-notification-count", 128U)
+             .IntegerProperty("sp-notification-count", 384U)
+             .Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+	vm = &m->vm[0];
+	EXPECT_EQ(vm->partition.requested_vm_notification_count, 128U);
+	EXPECT_EQ(vm->partition.requested_sp_notification_count, 384U);
+	manifest_dealloc();
+}
+
+TEST_F(manifest, ffa_vm_notification_count_below_minimum)
+{
+	struct_manifest *m;
+
+	/* clang-format off */
+     std::vector<char> dtb = ManifestDtBuilder()
+             .FfaValidManifest(FFA_VERSION_1_3)
+             .BooleanProperty("notification-support")
+             .IntegerProperty("vm-notification-count", 63U)
+             .Build();
+	/* clang-format on */
+
+	EXPECT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_ILLEGAL_NOTIFICATION_COUNT);
+	manifest_dealloc();
+}
+
+TEST_F(manifest, ffa_sp_notification_count_above_maximum)
+{
+	struct_manifest *m;
+
+	/* clang-format off */
+       std::vector<char> dtb = ManifestDtBuilder()
+               .FfaValidManifest(FFA_VERSION_1_3)
+               .BooleanProperty("notification-support")
+               .IntegerProperty("sp-notification-count", 385U)
+               .Build();
+	/* clang-format on */
+
+	EXPECT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_ILLEGAL_NOTIFICATION_COUNT);
+	manifest_dealloc();
+}
+
+TEST_F(manifest, ffa_extended_notification_count_requires_v1_3)
+{
+	struct_manifest *m;
+
+	/* clang-format off */
+     std::vector<char> dtb = ManifestDtBuilder()
+             .FfaValidManifest(FFA_VERSION_1_2)
+             .BooleanProperty("notification-support")
+             .IntegerProperty("vm-notification-count", 65U)
+             .Build();
+	/* clang-format on */
+
+	EXPECT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_ILLEGAL_NOTIFICATION_COUNT);
+	manifest_dealloc();
+}
+
 } /* namespace */

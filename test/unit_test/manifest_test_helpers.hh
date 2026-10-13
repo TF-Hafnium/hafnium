@@ -283,11 +283,12 @@ class ManifestDtBuilder
 		return *this;
 	}
 
-	ManifestDtBuilder &FfaValidManifest()
+	ManifestDtBuilder &FfaValidManifest(
+		enum ffa_version ffa_version = FFA_VERSION_1_0)
 	{
 		/* clang-format off */
 		Compatible({"arm,ffa-manifest-1.1"});
-		Property("ffa-version", "<0x10000>");
+		IntegerProperty("ffa-version", ffa_version, true);
 		Property("execution-ctx-count", "<1>");
 		Property("exception-level", "<2>");
 		Property("execution-state", "<0>");
