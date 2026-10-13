@@ -10,6 +10,7 @@
 
 #include "hf/arch/other_world.h"
 
+#include "hf/check.h"
 #include "hf/ffa.h"
 #include "hf/ffa/init.h"
 #include "hf/ffa_internal.h"
@@ -167,10 +168,12 @@ bool ffa_notifications_is_get_valid(struct vcpu *current, ffa_id_t receiver_id,
 }
 
 struct ffa_value ffa_notifications_bitmap_create(ffa_id_t vm_id,
-						 ffa_vcpu_count_t vcpu_count)
+						 ffa_vcpu_count_t vcpu_count,
+						 uint16_t notification_count)
 {
 	(void)vm_id;
 	(void)vcpu_count;
+	(void)notification_count;
 
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
@@ -182,16 +185,27 @@ struct ffa_value ffa_notifications_bitmap_destroy(ffa_id_t vm_id)
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
 
-bool ffa_notifications_bitmap_create_call(ffa_id_t vm_id,
-					  ffa_vcpu_count_t vcpu_count)
+bool ffa_notifications_bitmap_create_call(
+	ffa_id_t vm_id, ffa_vcpu_count_t vcpu_count,
+	uint16_t requested_notification_count,
+	uint16_t *allocated_notification_count)
 {
 	struct ffa_value ret;
+	uint32_t encoded_notification_count;
+
+	CHECK(allocated_notification_count != NULL);
+	CHECK(requested_notification_count >= FFA_NOTIFICATION_COUNT_BASE);
+	CHECK(requested_notification_count <= MAX_FFA_NOTIFICATIONS);
+
+	*allocated_notification_count = requested_notification_count;
 
 	if (ffa_init_is_tee_enabled()) {
 		ret = arch_other_world_call((struct ffa_value){
 			.func = FFA_NOTIFICATION_BITMAP_CREATE_32,
 			.arg1 = vm_id,
 			.arg2 = vcpu_count,
+			.arg3 = FFA_NOTIFICATION_COUNT_ENCODE(
+				requested_notification_count),
 		});
 
 		if (ret.func == FFA_ERROR_32) {
@@ -199,6 +213,29 @@ bool ffa_notifications_bitmap_create_call(ffa_id_t vm_id,
 				"Failed to create notifications bitmap "
 				"to VM: %#x; error: %#x.\n",
 				vm_id, ffa_error_code(ret));
+			return false;
+		}
+
+		encoded_notification_count = (uint32_t)ret.arg2;
+		encoded_notification_count &= FFA_NOTIFICATION_COUNT_MASK;
+		if (encoded_notification_count >
+		    FFA_NOTIFICATION_COUNT_ENCODE(MAX_FFA_NOTIFICATIONS)) {
+			dlog_error(
+				"SPMC returned an invalid notification count: "
+				"%#x.\n",
+				encoded_notification_count);
+			return false;
+		}
+
+		*allocated_notification_count = FFA_NOTIFICATION_COUNT_DECODE(
+			encoded_notification_count);
+		if (*allocated_notification_count <
+		    requested_notification_count) {
+			dlog_error(
+				"SPMC allocated fewer notifications than "
+				"requested: %u < %u.\n",
+				*allocated_notification_count,
+				requested_notification_count);
 			return false;
 		}
 	}

@@ -505,7 +505,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 	case FFA_NOTIFICATION_BITMAP_CREATE_32:
 		*args = api_ffa_notification_bitmap_create(
 			(ffa_id_t)args->arg1, (ffa_vcpu_count_t)args->arg2,
-			current);
+			(uint32_t)args->arg3, current);
 		return true;
 	case FFA_NOTIFICATION_BITMAP_DESTROY_32:
 		*args = api_ffa_notification_bitmap_destroy(

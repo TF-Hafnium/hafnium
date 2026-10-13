@@ -423,6 +423,10 @@ enum ffa_notification_feature_flags : uint32_t {
 	(((uint32_t)(count) - FFA_NOTIFICATION_COUNT_BASE) & \
 	 FFA_NOTIFICATION_COUNT_MASK)
 
+#define FFA_NOTIFICATION_COUNT_DECODE(count)                            \
+	((uint16_t)(((uint32_t)(count) & FFA_NOTIFICATION_COUNT_MASK) + \
+		    FFA_NOTIFICATION_COUNT_BASE))
+
 /** Constants for bitmasks used in FFA_FEATURES. */
 #define FFA_FEATURES_FEATURE_BIT (31U)
 #define FFA_FEATURES_FEATURE_MBZ_HI_BIT (30U)

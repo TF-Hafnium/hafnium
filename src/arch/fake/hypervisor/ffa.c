@@ -263,10 +263,12 @@ bool ffa_notifications_set_forward(ffa_id_t sender_vm_id,
 }
 
 struct ffa_value ffa_notifications_bitmap_create(ffa_id_t vm_id,
-						 ffa_vcpu_count_t vcpu_count)
+						 ffa_vcpu_count_t vcpu_count,
+						 uint16_t notification_count)
 {
 	(void)vm_id;
 	(void)vcpu_count;
+	(void)notification_count;
 
 	return ffa_error(FFA_NOT_SUPPORTED);
 }

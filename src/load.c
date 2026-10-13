@@ -169,6 +169,7 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 	struct device_region dev_region;
 	struct interrupt_info interrupt;
 	uint32_t k = 0;
+	uint16_t allocated_notification_count;
 
 	vm_locked.vm->smc_whitelist = manifest_vm->smc_whitelist;
 	vm_locked.vm->power_management =
@@ -286,8 +287,16 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 
 		if (vm_locked_are_notifications_enabled(vm_locked) &&
 		    !ffa_notifications_bitmap_create_call(
-			    vm_locked.vm->id, vm_locked.vm->vcpu_count)) {
+			    vm_locked.vm->id, vm_locked.vm->vcpu_count,
+			    manifest_vm->partition
+				    .requested_sp_notification_count,
+			    &allocated_notification_count)) {
 			return false;
+		}
+
+		if (vm_locked_are_notifications_enabled(vm_locked)) {
+			vm_notifications_set_allocated_count(
+				vm_locked, false, allocated_notification_count);
 		}
 	}
 

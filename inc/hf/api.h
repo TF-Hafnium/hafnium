@@ -113,6 +113,7 @@ struct vcpu *api_switch_to_other_world(struct vcpu_locked current_locked,
 				       enum vcpu_state vcpu_state);
 struct ffa_value api_ffa_notification_bitmap_create(ffa_id_t vm_id,
 						    ffa_vcpu_count_t vcpu_count,
+						    uint32_t notification_count,
 						    struct vcpu *current);
 struct ffa_value api_ffa_notification_bitmap_destroy(ffa_id_t vm_id,
 						     struct vcpu *current);

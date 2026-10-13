@@ -249,10 +249,21 @@ void ffa_notifications_info_get_forward(     // NOLINTNEXTLINE
 }
 
 struct ffa_value ffa_notifications_bitmap_create(ffa_id_t vm_id,
-						 ffa_vcpu_count_t vcpu_count)
+						 ffa_vcpu_count_t vcpu_count,
+						 uint16_t notification_count)
 {
-	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+	struct ffa_value ret = (struct ffa_value){
+		.func = FFA_SUCCESS_32,
+		.arg2 = FFA_NOTIFICATION_COUNT_ENCODE(notification_count),
+	};
 	struct vm_locked vm_locked;
+
+	if (notification_count > MAX_FFA_NOTIFICATIONS) {
+		dlog_verbose(
+			"Requested notification count is not supported: %u.\n",
+			notification_count);
+		return ffa_error(FFA_NO_MEMORY);
+	}
 
 	if (vm_id == HF_OTHER_WORLD_ID) {
 		/*
@@ -295,17 +306,25 @@ struct ffa_value ffa_notifications_bitmap_create(ffa_id_t vm_id,
 		vm_locked.vm->vcpu_count = vcpu_count;
 	}
 
+	vm_notifications_set_allocated_count(vm_locked, false,
+					     notification_count);
+
 out:
 	vm_unlock(&vm_locked);
 
 	return ret;
 }
 
-bool ffa_notifications_bitmap_create_call(ffa_id_t vm_id,
-					  ffa_vcpu_count_t vcpu_count)
+bool ffa_notifications_bitmap_create_call(
+	ffa_id_t vm_id, ffa_vcpu_count_t vcpu_count,
+	uint16_t requested_notification_count,
+	uint16_t *allocated_notification_count)
 {
 	(void)vm_id;
 	(void)vcpu_count;
+	CHECK(allocated_notification_count != NULL);
+
+	*allocated_notification_count = requested_notification_count;
 
 	return true;
 }

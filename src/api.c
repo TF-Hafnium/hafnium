@@ -4769,10 +4769,12 @@ struct ffa_value api_ffa_secondary_ep_register(ipaddr_t entry_point,
 
 struct ffa_value api_ffa_notification_bitmap_create(ffa_id_t vm_id,
 						    ffa_vcpu_count_t vcpu_count,
+						    uint32_t notification_count,
 						    struct vcpu *current)
 {
 	const struct ffa_value ret =
 		ffa_notifications_is_bitmap_access_valid(current, vm_id);
+	uint16_t requested_notification_count;
 
 	if (ffa_func_id(ret) != FFA_SUCCESS_32) {
 		dlog_verbose(
@@ -4782,7 +4784,18 @@ struct ffa_value api_ffa_notification_bitmap_create(ffa_id_t vm_id,
 		return ret;
 	}
 
-	return ffa_notifications_bitmap_create(vm_id, vcpu_count);
+	/* Before FF-A v1.3, w3 is reserved and must be zero. */
+	if (current->vm->ffa_version < FFA_VERSION_1_3 &&
+	    notification_count != 0U) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* FF-A v1.3 defines the count in w3[8:0]; ignore reserved bits. */
+	requested_notification_count =
+		FFA_NOTIFICATION_COUNT_DECODE(notification_count);
+
+	return ffa_notifications_bitmap_create(vm_id, vcpu_count,
+					       requested_notification_count);
 }
 
 struct ffa_value api_ffa_notification_bitmap_destroy(ffa_id_t vm_id,

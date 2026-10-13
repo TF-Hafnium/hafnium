@@ -70,15 +70,18 @@ struct ffa_value ffa_notifications_get2_framework_notifications(
  * Creates a bitmap for the VM of the given ID.
  */
 struct ffa_value ffa_notifications_bitmap_create(ffa_id_t vm_id,
-						 ffa_vcpu_count_t vcpu_count);
+						 ffa_vcpu_count_t vcpu_count,
+						 uint16_t notification_count);
 
 /**
  * Issues a FFA_NOTIFICATION_BITMAP_CREATE.
  * Returns true if the call goes well, and false if call returns with
  * FFA_ERROR_32.
  */
-bool ffa_notifications_bitmap_create_call(ffa_id_t vm_id,
-					  ffa_vcpu_count_t vcpu_count);
+bool ffa_notifications_bitmap_create_call(
+	ffa_id_t vm_id, ffa_vcpu_count_t vcpu_count,
+	uint16_t requested_notification_count,
+	uint16_t *allocated_notification_count);
 
 /**
  * Destroys the notifications bitmap for the given VM ID.
