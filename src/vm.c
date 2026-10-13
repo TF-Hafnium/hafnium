@@ -667,6 +667,22 @@ void vm_notifications_set_allocated_count(struct vm_locked vm_locked,
 	notifications->allocated_count = notification_count;
 }
 
+bool vm_notifications_bitmap_is_within_allocated_count(
+	struct vm_locked vm_locked, bool is_from_vm,
+	ffa_notifications_bitmap_t notifications)
+{
+	const uint16_t allocated_count =
+		vm_notifications_get_allocated_count(vm_locked, is_from_vm);
+
+	for (uint32_t i = allocated_count; i < MAX_FFA_NOTIFICATIONS; ++i) {
+		if (ffa_notification_bitmap_is_set(notifications, i)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 /**
  * Checks if there are pending notifications.
  */

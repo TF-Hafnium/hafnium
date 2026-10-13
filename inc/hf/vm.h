@@ -404,6 +404,9 @@ uint16_t vm_notifications_get_allocated_count(struct vm_locked vm_locked,
 void vm_notifications_set_allocated_count(struct vm_locked vm_locked,
 					  bool is_from_vm,
 					  uint16_t notification_count);
+bool vm_notifications_bitmap_is_within_allocated_count(
+	struct vm_locked vm_locked, bool is_from_vm,
+	ffa_notifications_bitmap_t notifications);
 bool vm_mailbox_state_busy(struct vm_locked vm_locked);
 bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
 				  ffa_notifications_bitmap_t notifications);

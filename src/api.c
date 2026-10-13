@@ -6220,6 +6220,16 @@ static struct ffa_value ffa_notifications_update_bindings_local(
 		goto out;
 	}
 
+	if (!vm_notifications_bitmap_is_within_allocated_count(
+		    receiver_locked, ffa_is_vm_id(sender_vm_id),
+		    notifications)) {
+		dlog_verbose(
+			"Notification bitmap exceeds receiver's allocated "
+			"count.\n");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
 	if (is_bind && vm_id_is_current_world(sender_vm_id) &&
 	    vm_find(sender_vm_id) == NULL) {
 		dlog_verbose("Sender VM does not exist!\n");
@@ -6462,6 +6472,16 @@ struct ffa_value api_ffa_notification_set2(
 		goto out;
 	}
 
+	if (!vm_notifications_bitmap_is_within_allocated_count(
+		    receiver_locked, ffa_is_vm_id(sender_vm_id),
+		    notifications)) {
+		dlog_verbose(
+			"Notification bitmap exceeds receiver's allocated "
+			"count.\n");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
 	/**
 	 * Every selected notification must have previously been bound to this
 	 * sender by the Receiver through BIND or BIND2.
@@ -6603,6 +6623,19 @@ struct ffa_value api_ffa_notification_get2(ffa_id_t receiver_vm_id,
 			"%zu!\n",
 			vcpu_id, receiver_locked.vm->vcpu_count,
 			cpu_index(current->cpu));
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	if (((flags & FFA_NOTIFICATION_FLAG_BITMAP_SP) != 0U &&
+	     !vm_notifications_bitmap_is_within_allocated_count(
+		     receiver_locked, false, sp_mask)) ||
+	    ((flags & FFA_NOTIFICATION_FLAG_BITMAP_VM) != 0U &&
+	     !vm_notifications_bitmap_is_within_allocated_count(
+		     receiver_locked, true, vm_mask))) {
+		dlog_verbose(
+			"Notification mask exceeds receiver's allocated "
+			"count.\n");
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
