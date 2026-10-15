@@ -1443,8 +1443,9 @@ TEST_SERVICE(share_ffa_v1_1)
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE, NULL,
 		&msg_size);
 
-	EXPECT_NE(ffa_version(FFA_VERSION_1_1, VERSION_QUERY_NEGOTIATE),
-		  FFA_ERROR_32);
+	EXPECT_NE(
+		(uint32_t)ffa_version(FFA_VERSION_1_1, VERSION_QUERY_NEGOTIATE),
+		(uint32_t)FFA_ERROR_32);
 
 	ret = ffa_mem_share(msg_size, msg_size);
 

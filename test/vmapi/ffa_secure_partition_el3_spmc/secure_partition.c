@@ -326,8 +326,8 @@ TEST(ffa_boot_info, parse_fdt)
  */
 TEST(ffa_version, fail_on_invalid_version)
 {
-	EXPECT_EQ(ffa_version(0xffffffff, VERSION_QUERY_NEGOTIATE),
-		  FFA_NOT_SUPPORTED);
+	EXPECT_EQ((uint32_t)ffa_version(0xffffffff, VERSION_QUERY_NEGOTIATE),
+		  (uint32_t)FFA_NOT_SUPPORTED);
 }
 
 /*
