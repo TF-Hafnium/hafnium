@@ -33,7 +33,7 @@ bool ffa_setup_partition_info_get_regs_forward_allowed(void);
 size_t ffa_setup_partition_info_get_forward(
 	const struct ffa_uuid *uuid, uint32_t flags,
 	struct ffa_partition_info *partitions, size_t partitions_max_len,
-	const size_t entries_count);
+	size_t entries_count);
 
 void ffa_setup_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 					paddr_t fdt_addr,
@@ -43,7 +43,7 @@ void ffa_setup_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 
 /** Return the FF-A partition info VM/SP properties given the VM id. */
 ffa_partition_properties_t ffa_setup_partition_properties(
-	ffa_id_t caller_id, const struct vm *target, const size_t service_idx);
+	ffa_id_t caller_id, const struct vm *target, size_t service_idx);
 
 bool ffa_setup_rx_release_forward(struct vm_locked vm_locked,
 				  struct ffa_value *ret);

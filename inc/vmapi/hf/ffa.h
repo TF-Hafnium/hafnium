@@ -1825,10 +1825,9 @@ static inline bool ffa_notification_info_get_more_pending(struct ffa_value args)
 	return (args.arg2 & FFA_NOTIFICATIONS_INFO_GET_FLAG_MORE_PENDING) != 0U;
 }
 
-void ffa_notification_info_get_and_check(
-	const uint32_t expected_lists_count,
-	const uint32_t *const expected_lists_sizes,
-	const uint16_t *const expected_ids);
+void ffa_notification_info_get_and_check(uint32_t expected_lists_count,
+					 const uint32_t *expected_lists_sizes,
+					 const uint16_t *expected_ids);
 
 /**
  * A set of contiguous pages which is part of a memory region. This corresponds

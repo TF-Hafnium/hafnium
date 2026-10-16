@@ -295,7 +295,7 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 void vcpu_set_phys_core_idx(struct vcpu *vcpu);
 void vcpu_set_boot_info_gp_reg(struct vcpu *vcpu);
 
-void vcpu_bootstrap(const struct vcpu_locked locked, struct cpu *cpu,
+void vcpu_bootstrap(struct vcpu_locked locked, struct cpu *cpu,
 		    bool set_phys_idx);
 
 static inline void vcpu_call_chain_extend(struct vcpu_locked vcpu1_locked,

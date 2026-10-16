@@ -194,4 +194,4 @@ ffa_memory_handle_t share_page_with_endpoints(uint64_t page,
 void partition_info_convert_to_v1_1_format(
 	const struct ffa_partition_info *incoming,
 	struct ffa_partition_info_v1_1 partition_info_v1_1[],
-	const struct ffa_value ret);
+	struct ffa_value ret);
