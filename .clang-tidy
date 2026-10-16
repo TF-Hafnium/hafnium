@@ -24,7 +24,7 @@ Checks: >
   -readability-math-missing-parentheses,
   -readability-suspicious-call-argument,
 
-ExcludeHeaderFilterRegex: '^third_party/.*'
+ExcludeHeaderFilterRegex: '(^|.*/)third_party/.*'
 
 FormatStyle: file
 WarningsAsErrors: '*'
