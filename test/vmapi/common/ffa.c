@@ -511,9 +511,11 @@ void memory_region_desc_from_rx_fragments(uint32_t fragment_length,
 		ASSERT_LE(fragment_offset + fragment_length,
 			  memory_region_max_size);
 		/* Copy received fragment. */
-		memcpy_s((uint8_t *)memory_region + fragment_offset,
-			 memory_region_max_size - fragment_offset, recv_buf,
-			 fragment_length);
+		if (memory_region != NULL) {
+			memcpy_s((uint8_t *)memory_region + fragment_offset,
+				 memory_region_max_size - fragment_offset,
+				 recv_buf, fragment_length);
+		}
 		fragment_offset += fragment_length;
 		ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 	}
