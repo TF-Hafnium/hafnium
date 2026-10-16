@@ -74,7 +74,6 @@ void check_echo_payload(ffa_id_t sender_id, ffa_id_t receiver_id,
 bool sp1_fail_at_boot(void);
 bool sp2_fail_at_boot(void);
 bool sp3_fail_at_boot(void);
-bool service2_is_mp_sp(void);
 bool service2_is_el0(void);
 void setup_wdog_timer_interrupt(void);
 void start_wdog_timer(uint32_t time_ms);

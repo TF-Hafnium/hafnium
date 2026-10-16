@@ -16,7 +16,7 @@
 #if (defined GENERATE_BINARY) && (defined VERIFY_HEADER)
 #error Only one action can be specified
 
-#elif defined GENERATE_BINARY
+#elifdef GENERATE_BINARY
 
 /**
  * File being compiled to generate binaries with definitions of constants.
@@ -42,7 +42,7 @@
 #define DEFINE_SIZEOF(sym, type) DEFINE(sym, sizeof(type))
 #define DEFINE_OFFSETOF(sym, type, field) DEFINE(sym, offsetof(type, field))
 
-#elif defined VERIFY_HEADER
+#elifdef VERIFY_HEADER
 
 /**
  * File being compiled as part of the main build to check the values in

@@ -806,7 +806,7 @@ static inline const char *ffa_memory_shareability_name(
 enum ffa_memory_security : uint8_t {
 	FFA_MEMORY_SECURITY_UNSPECIFIED = 0,
 	FFA_MEMORY_SECURITY_SECURE = 0,
-	FFA_MEMORY_SECURITY_NON_SECURE,
+	FFA_MEMORY_SECURITY_NON_SECURE = 1,
 };
 
 static inline const char *ffa_memory_security_name(

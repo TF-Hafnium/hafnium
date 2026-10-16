@@ -55,7 +55,7 @@ bool ffa_notifications_update_bindings_forward(
 		*ret = arch_other_world_call((struct ffa_value){
 			.func = is_bind ? FFA_NOTIFICATION_BIND_32
 					: FFA_NOTIFICATION_UNBIND_32,
-			.arg1 = ((uint64_t)sender_id << 16) | (receiver_id),
+			.arg1 = ((uint64_t)sender_id << 16) | receiver_id,
 			.arg2 = is_bind ? flags : 0U,
 			.arg3 = ffa_notification_bitmap_low32(bitmap),
 			.arg4 = ffa_notification_bitmap_high32(bitmap),

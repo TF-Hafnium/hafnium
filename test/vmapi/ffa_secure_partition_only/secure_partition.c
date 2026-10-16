@@ -710,8 +710,8 @@ TEST(arch_features, enable_pauth)
 {
 	uint64_t sctlr_el1;
 	uint64_t sctlr_el1_enia = (UINT64_C(0x1) << 31);
-	uint64_t apiakeylo_el1_val = (0x123456789);
-	uint64_t apiakeyhi_el1_val = (0x987654321);
+	uint64_t apiakeylo_el1_val = 0x123456789;
+	uint64_t apiakeyhi_el1_val = 0x987654321;
 
 	arch_pauth_detect();
 

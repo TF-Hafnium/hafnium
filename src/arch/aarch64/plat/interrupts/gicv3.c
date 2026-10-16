@@ -604,10 +604,10 @@ static inline uint32_t gicr_affinity_to_core_pos(uint64_t typer_reg)
 	uint64_t aff0;
 	uint64_t reg;
 
-	aff3 = (typer_reg >> RDIST_AFF3_SHIFT) & (0xff);
-	aff2 = (typer_reg >> RDIST_AFF2_SHIFT) & (0xff);
-	aff1 = (typer_reg >> RDIST_AFF1_SHIFT) & (0xff);
-	aff0 = (typer_reg >> RDIST_AFF0_SHIFT) & (0xff);
+	aff3 = (typer_reg >> RDIST_AFF3_SHIFT) & 0xff;
+	aff2 = (typer_reg >> RDIST_AFF2_SHIFT) & 0xff;
+	aff1 = (typer_reg >> RDIST_AFF1_SHIFT) & 0xff;
+	aff0 = (typer_reg >> RDIST_AFF0_SHIFT) & 0xff;
 
 	/* Construct mpidr based on above affinities. */
 	reg = (aff3 << MPIDR_AFF3_SHIFT) | (aff2 << MPIDR_AFF2_SHIFT) |
@@ -720,10 +720,10 @@ void gicv3_send_sgi(uint32_t sgi_id, bool send_to_all, uint64_t mpidr_target,
 		 * will be delivered the interrupt. At least one has to be
 		 * enabled.
 		 */
-		aff3 = (mpidr_target >> MPIDR_AFF3_SHIFT) & (0xff);
-		aff2 = (mpidr_target >> MPIDR_AFF2_SHIFT) & (0xff);
-		aff1 = (mpidr_target >> MPIDR_AFF1_SHIFT) & (0xff);
-		aff0 = (mpidr_target >> MPIDR_AFF0_SHIFT) & (0xff);
+		aff3 = (mpidr_target >> MPIDR_AFF3_SHIFT) & 0xff;
+		aff2 = (mpidr_target >> MPIDR_AFF2_SHIFT) & 0xff;
+		aff1 = (mpidr_target >> MPIDR_AFF1_SHIFT) & 0xff;
+		aff0 = (mpidr_target >> MPIDR_AFF0_SHIFT) & 0xff;
 
 		/* Populate the various affinity fields. */
 		sgir |= ((aff3 & SGIR_AFF_MASK) << SGIR_AFF3_SHIFT) |

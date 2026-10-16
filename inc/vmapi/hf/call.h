@@ -643,7 +643,7 @@ static inline struct ffa_value ffa_notification_args(
 {
 	return (struct ffa_value){
 		.func = func,
-		.arg1 = ((uint64_t)sender_vm_id << 16) | (receiver_vm_id),
+		.arg1 = ((uint64_t)sender_vm_id << 16) | receiver_vm_id,
 		.arg2 = flags,
 		.arg3 = ffa_notification_bitmap_low32(bitmap),
 		.arg4 = ffa_notification_bitmap_high32(bitmap),
@@ -728,7 +728,7 @@ static inline struct ffa_value ffa_notification_get(ffa_id_t receiver_vm_id,
 {
 	return ffa_call((struct ffa_value){
 		.func = FFA_NOTIFICATION_GET_32,
-		.arg1 = ((uint64_t)vcpu_id << 16) | (receiver_vm_id),
+		.arg1 = ((uint64_t)vcpu_id << 16) | receiver_vm_id,
 		.arg2 = flags,
 	});
 }

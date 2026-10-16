@@ -76,7 +76,7 @@ enum abort_action {
 	/**
 	 * SPMC takes implementation defined action if not specified explicitly.
 	 */
-	ACTION_IMP_DEF,
+	ACTION_IMP_DEF = 4,
 
 	/** No other actions supported. */
 };

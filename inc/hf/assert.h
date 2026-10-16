@@ -8,7 +8,7 @@
 
 #pragma once
 
-#if !defined(__cplusplus)
+#ifndef __cplusplus
 
 #include <stdint.h>
 

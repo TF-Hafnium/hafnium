@@ -598,7 +598,7 @@ TEST_PRECONDITION(indirect_messaging_v1_2,
 {
 	const uint8_t sentinel = 0xA5;
 	const size_t recv_size =
-		(size_t)FFA_PAGE_SIZE * FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT;
+		FFA_PAGE_SIZE * FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT;
 	const char payload[] = "tail-zero check";
 	char recv_payload[sizeof(payload)];
 	struct ffa_value ret;
