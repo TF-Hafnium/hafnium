@@ -8,6 +8,7 @@
 
 #include "test/vmapi/arch/exception_handler.h"
 
+#include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/ffa.h"
 
@@ -48,7 +49,7 @@ ffa_vcpu_index_t get_current_vcpu_index(void)
 	ffa_vcpu_index_t index;
 
 	index = read_msr(mpidr_el1) & MPIDR_RES1_CLEAR_MASK;
-	EXPECT_LT(index, MAX_CPUS);
+	CHECK(index < MAX_CPUS);
 
 	return index;
 }

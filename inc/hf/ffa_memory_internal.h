@@ -53,6 +53,7 @@ static_assert(sizeof(ffa_memory_attributes_t) == 2,
 static_assert(sizeof(ffa_memory_attributes_v1_0) == 1,
 	      "ffa_memory_attributes_v1_0 must be 1 byte wide");
 
+/* NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding) */
 struct ffa_memory_share_state {
 	/**
 	 * The memory region being shared, or NULL if this share state is

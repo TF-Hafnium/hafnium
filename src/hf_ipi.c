@@ -48,6 +48,7 @@ struct vcpu *hf_ipi_get_pending_target_vcpu(struct vcpu *current)
 	struct vcpu *target_vcpu;
 
 	/* Lock the CPU the list belongs to. */
+	// NOLINTNEXTLINE(clang-analyzer-security.ArrayBound)
 	sl_lock(&current->cpu->lock);
 
 	/*

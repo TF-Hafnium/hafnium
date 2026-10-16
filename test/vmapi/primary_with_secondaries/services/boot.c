@@ -99,6 +99,7 @@ TEST_SERVICE(boot_memory_underrun)
 	 * Try to read memory below the start of the image. This should result
 	 * in the VM trapping and yielding.
 	 */
+	// NOLINTNEXTLINE(clang-analyzer-security.ArrayBound)
 	dlog("Read memory below limit: %d\n", mem_ptr[-1]);
 	FAIL("Managed to read memory below limit");
 }

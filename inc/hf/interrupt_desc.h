@@ -13,6 +13,8 @@
 #include "hf/arch/std.h"
 #include "hf/arch/types.h"
 
+#include "hf/check.h"
+
 #include "vmapi/hf/ffa.h"
 
 /**
@@ -29,6 +31,9 @@ struct interrupt_bitmap {
 static inline uint32_t interrupt_bitmap_get_value(
 	struct interrupt_bitmap *bitmap, uint32_t intid)
 {
+	if (intid >= HF_NUM_INTIDS) {
+		return 0U;
+	}
 	uint32_t index = intid / INTERRUPT_REGISTER_BITS;
 	uint32_t shift = intid % INTERRUPT_REGISTER_BITS;
 
@@ -38,6 +43,8 @@ static inline uint32_t interrupt_bitmap_get_value(
 static inline void interrupt_bitmap_set_value(struct interrupt_bitmap *bitmap,
 					      uint32_t intid)
 {
+	CHECK(intid < HF_NUM_INTIDS);
+
 	uint32_t index = intid / INTERRUPT_REGISTER_BITS;
 	uint32_t shift = intid % INTERRUPT_REGISTER_BITS;
 
@@ -47,6 +54,8 @@ static inline void interrupt_bitmap_set_value(struct interrupt_bitmap *bitmap,
 static inline void interrupt_bitmap_clear_value(struct interrupt_bitmap *bitmap,
 						uint32_t intid)
 {
+	CHECK(intid < HF_NUM_INTIDS);
+
 	uint32_t index = intid / INTERRUPT_REGISTER_BITS;
 	uint32_t shift = intid % INTERRUPT_REGISTER_BITS;
 

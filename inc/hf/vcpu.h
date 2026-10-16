@@ -158,6 +158,7 @@ struct log_buffer {
 	uint16_t len;
 };
 
+/* NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding) */
 struct vcpu {
 	struct spinlock lock;
 
