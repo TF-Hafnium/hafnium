@@ -1196,6 +1196,45 @@ notification bitmaps from 32 to 64 notification IDs each.
 An FF-A component can use ``FFA_FEATURES`` with notification Feature ID ``0x4``
 to discover the VM and SP notification counts advertised by Hafnium.
 
+When ``notification-support`` is present, a partition manifest may specify the
+following optional properties:
+
+- ``vm-notification-count`` sets the number of notification IDs that VM
+  senders can use to signal the endpoint.
+- ``sp-notification-count`` sets the number of notification IDs that SP
+  senders can use to signal the endpoint.
+
+The properties configure separate per-endpoint VM and SP notification bitmap
+allocation sizes. If a property is absent, its allocation defaults to 64
+notification IDs. For an endpoint using an FF-A version earlier than v1.3,
+each allocation must remain at 64. For an endpoint using FF-A v1.3 or later,
+each property may request from 64 through 384 notification IDs, inclusive.
+A property is ignored when ``notification-support`` is absent, and an endpoint
+is not loaded if its requested allocation cannot be supported.
+
+For example, an FF-A v1.3 endpoint can request 128 VM notification IDs and
+384 SP notification IDs as follows:
+
+.. code:: dts
+
+    / {
+        compatible = "arm,ffa-manifest-1.1";
+        debug_name = "example-partition";
+
+        /* FF-A v1.3 notification properties. */
+        /* 31:16 - Major, 15:0 - Minor. */
+        ffa-version = <0x00010003>;
+        notification-support;
+        vm-notification-count = <128>;
+        sp-notification-count = <384>;
+    };
+
+For a Normal-world VM, ``sp-notification-count`` is the count requested from
+the SPMC through ``FFA_NOTIFICATION_BITMAP_CREATE``. The SPMC may allocate the
+requested number of SP notification IDs or a larger number.
+The Hypervisor records the count returned by the SPMC as the VM's SP
+notification allocation.
+
 The signaling of notifications can interchangeably happen between NWd and SWd
 FF-A endpoints.
 
