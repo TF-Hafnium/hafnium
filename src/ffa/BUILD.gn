@@ -15,13 +15,22 @@ config("hypervisor_config") {
   include_dirs = [ "inc" ]
 }
 
+source_set("hypervisor_notification_bitmap") {
+  public_configs = [ "//src/arch/${plat_arch}:arch_config" ]
+
+  sources = [ "hypervisor/notification_bitmap.c" ]
+}
+
 source_set("hypervisor") {
   public_configs = [
     "//src/arch/${plat_arch}:config",
     "//src/arch/${plat_arch}:arch_config",
     ":hypervisor_config",
   ]
-  deps = [ "//vmlib/${plat_arch}:smc_call" ]
+  deps = [
+    ":hypervisor_notification_bitmap",
+    "//vmlib/${plat_arch}:smc_call",
+  ]
   sources = [
     "hypervisor/cpu_cycles.c",
     "hypervisor/direct_messaging.c",

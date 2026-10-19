@@ -191,7 +191,6 @@ bool ffa_notifications_bitmap_create_call(
 	uint16_t *allocated_notification_count)
 {
 	struct ffa_value ret;
-	uint32_t encoded_notification_count;
 
 	CHECK(allocated_notification_count != NULL);
 	CHECK(requested_notification_count >= FFA_NOTIFICATION_COUNT_BASE);
@@ -208,38 +207,10 @@ bool ffa_notifications_bitmap_create_call(
 				requested_notification_count),
 		});
 
-		if (ret.func == FFA_ERROR_32) {
-			dlog_error(
-				"Failed to create notifications bitmap "
-				"to VM: %#x; error: %#x.\n",
-				vm_id, ffa_error_code(ret));
-			return false;
-		}
-
-		encoded_notification_count = (uint32_t)ret.arg2;
-		encoded_notification_count &= FFA_NOTIFICATION_COUNT_MASK;
-		if (encoded_notification_count >
-		    FFA_NOTIFICATION_COUNT_ENCODE(MAX_FFA_NOTIFICATIONS)) {
-			dlog_error(
-				"SPMC returned an invalid notification count: "
-				"%#x.\n",
-				encoded_notification_count);
-			return false;
-		}
-
-		*allocated_notification_count = FFA_NOTIFICATION_COUNT_DECODE(
-			encoded_notification_count);
-		if (*allocated_notification_count <
-		    requested_notification_count) {
-			dlog_error(
-				"SPMC allocated fewer notifications than "
-				"requested: %u < %u.\n",
-				*allocated_notification_count,
-				requested_notification_count);
-			return false;
-		}
+		return ffa_notifications_bitmap_create_process_response(
+			vm_id, requested_notification_count, ret,
+			allocated_notification_count);
 	}
-
 	return true;
 }
 

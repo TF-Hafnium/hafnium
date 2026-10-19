@@ -74,6 +74,18 @@ struct ffa_value ffa_notifications_bitmap_create(ffa_id_t vm_id,
 						 uint16_t notification_count);
 
 /**
+ * Processes the response returned by the SPMC for
+ * FFA_NOTIFICATION_BITMAP_CREATE.
+ *
+ * Validates and decodes the allocated SP notification count returned in w2.
+ * The returned allocation may equal or exceed the count requested by the
+ * Hypervisor.
+ */
+bool ffa_notifications_bitmap_create_process_response(
+	ffa_id_t vm_id, uint16_t requested_notification_count,
+	struct ffa_value response, uint16_t *allocated_notification_count);
+
+/**
  * Issues a FFA_NOTIFICATION_BITMAP_CREATE.
  * Returns true if the call goes well, and false if call returns with
  * FFA_ERROR_32.

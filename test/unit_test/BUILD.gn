@@ -30,6 +30,7 @@ executable("unit_tests") {
   deps = [
     "//src:memiter",
     "//src:src_testable",
+    "//src/ffa:hypervisor_notification_bitmap",
     "//third_party/googletest:gtest_main",
   ]
 }

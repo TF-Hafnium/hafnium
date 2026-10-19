@@ -13,6 +13,7 @@ extern "C" {
 
 #include "hf/check.h"
 #include "hf/ffa.h"
+#include "hf/ffa/notifications.h"
 #include "hf/mm.h"
 #include "hf/plat/memory_alloc.h"
 #include "hf/timer_mgmt.h"
@@ -770,6 +771,54 @@ TEST_F(vm, vm_notifications_validates_allocated_counts)
 	/* Restore shared VM state for subsequent tests. */
 	vm_notifications_set_allocated_count(vm_locked, is_from_vm,
 					     FFA_NOTIFICATION_COUNT_BASE);
+	vm_notifications_set_allocated_count(vm_locked, is_from_sp,
+					     FFA_NOTIFICATION_COUNT_BASE);
+	vm_unlock(&vm_locked);
+}
+
+/**
+ * Verify that an SPMC allocation larger than the VM's requested count is
+ * accepted and can be recorded as the VM's SP notification allocation.
+ *
+ * FF-A v1.3 permits the SPMC allocation to equal or exceed the requested
+ * notification count.
+ */
+TEST_F(vm, vm_records_larger_spmc_notification_allocation)
+{
+	const uint16_t requested_count = 128U;
+	const uint16_t spmc_allocated_count = 256U;
+	const bool is_from_sp = false;
+	uint16_t allocated_count = 0U;
+	struct ffa_value response = {
+		.func = FFA_SUCCESS_32,
+		/*
+		 * Simulate the SPMC returning 256 notification IDs even
+		 * though the Hypervisor requested only 128.
+		 */
+		.arg2 = FFA_NOTIFICATION_COUNT_ENCODE(spmc_allocated_count),
+	};
+	struct vm_locked vm_locked;
+
+	/*
+	 * Process the simulated FFA_NOTIFICATION_BITMAP_CREATE response using
+	 * the same validation and decoding path as the Hypervisor.
+	 */
+	ASSERT_TRUE(ffa_notifications_bitmap_create_process_response(
+		HF_PRIMARY_VM_ID, requested_count, response, &allocated_count));
+	EXPECT_GT(allocated_count, requested_count);
+	ASSERT_EQ(allocated_count, spmc_allocated_count);
+
+	/*
+	 * load_common() records the returned value, rather than the original
+	 * request, as the VM's SP notification allocation.
+	 */
+	vm_locked = vm_lock(vm_find_index(0));
+	vm_notifications_set_allocated_count(vm_locked, is_from_sp,
+					     allocated_count);
+	EXPECT_EQ(vm_notifications_get_allocated_count(vm_locked, is_from_sp),
+		  spmc_allocated_count);
+
+	/* Restore shared VM state for subsequent tests. */
 	vm_notifications_set_allocated_count(vm_locked, is_from_sp,
 					     FFA_NOTIFICATION_COUNT_BASE);
 	vm_unlock(&vm_locked);
