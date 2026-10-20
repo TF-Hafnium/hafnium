@@ -63,4 +63,5 @@ enum manifest_return_code {
 	MANIFEST_ERROR_TOO_MANY_IMAGE_UUIDS,
 	/* Duplicate image UUID across secure partition manifests */
 	MANIFEST_ERROR_DUPLICATE_IMAGE_UUID,
+	MANIFEST_ERROR_INTERRUPT_ID_OUT_OF_RANGE,
 };

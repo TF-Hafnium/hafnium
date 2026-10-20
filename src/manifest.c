@@ -851,6 +851,10 @@ static enum manifest_return_code parse_ffa_device_region_node(
 				&list, &dev_regions[i].interrupts[j].id));
 			intid = dev_regions[i].interrupts[j].id;
 
+			if (intid >= HF_NUM_INTIDS) {
+				return MANIFEST_ERROR_INTERRUPT_ID_OUT_OF_RANGE;
+			}
+
 			dlog_verbose("        ID = %u\n", intid);
 
 			if (interrupt_bitmap_get_value(&allocated_intids,
@@ -894,6 +898,9 @@ static enum manifest_return_code parse_ffa_device_region_node(
 
 				TRY(uint32list_get_next(&list, &intid));
 
+				if (intid >= HF_NUM_INTIDS) {
+					return MANIFEST_ERROR_INTERRUPT_ID_OUT_OF_RANGE;
+				}
 				dlog_verbose("        ID = %u\n", intid);
 
 				if (interrupt_bitmap_get_value(
@@ -1922,6 +1929,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Manifest specifies more than one image UUID";
 	case MANIFEST_ERROR_DUPLICATE_IMAGE_UUID:
 		return "Duplicate image UUID across secure partition manifests";
+	case MANIFEST_ERROR_INTERRUPT_ID_OUT_OF_RANGE:
+		return "Interrupt ID is out of the valid range";
 	}
 
 	panic("Unexpected manifest return code.");
