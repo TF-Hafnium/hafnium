@@ -2577,8 +2577,8 @@ static bool ffa_version_get_compatibility_response(
  * Returns Hafnium's version number (`FFA_VERSION_COMPILED`) on success.
  * Returns the closest implemented version if the requested version is
  * incompatible. Returns `SMCCC_INVALID_PARAMETER` if the version is invalid
- * (highest bit set). Returns the Null version if renegotiation is denied
- * because the framework is already in use by the caller.
+ * (highest bit set). If the framework is already in use, return the
+ * caller's previously negotiated version without changing it.
  */
 struct ffa_value api_ffa_version(struct vcpu *current,
 				 enum ffa_version requested_version)
@@ -2588,9 +2588,6 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 
 	const struct ffa_value invalid_parameter = {
 		.func = SMCCC_INVALID_PARAMETER,
-	};
-	const struct ffa_value null_version = {
-		.func = make_ffa_version(0, 0),
 	};
 	struct vm_locked current_vm_locked;
 	struct ffa_value compatibility_ret;
@@ -2623,11 +2620,12 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 	}
 
 	if (in_use) {
+		struct ffa_value negotiated_version = {
+			.func = current_vm_locked.vm->ffa_version,
+		};
+
 		vm_unlock(&current_vm_locked);
-		dlog_error(
-			"FFA_VERSION: Framework in use, returning Null "
-			"version\n");
-		return null_version;
+		return negotiated_version;
 	}
 
 	current_vm_locked.vm->ffa_version = requested_version;

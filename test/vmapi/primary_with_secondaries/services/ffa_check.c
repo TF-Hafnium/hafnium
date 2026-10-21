@@ -17,7 +17,8 @@
 
 alignas(PAGE_SIZE) static uint8_t shared_page[PAGE_SIZE];
 
-#define FFA_VERSION_NULL make_ffa_version(0, 0)
+/* The service 1 and 2 test manifests specify FF-A v1.2. */
+#define FFA_VERSION_INITIAL FFA_VERSION_1_2
 
 /**
  * Service for indirect message error checking.
@@ -64,10 +65,10 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_rxtx)
 	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED + 1), FFA_VERSION_COMPILED);
 
 	/*
-	 * Expect the Null version because the RX/TX buffers are still mapped to
-	 * coordinate the service select.
+	 * RX/TX buffers are still mapped for service selection, so expect
+	 * the previously negotiated version.
 	 */
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_NULL);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_INITIAL);
 
 	/*
 	 * Check that if the buffers are unmapped the version can be
@@ -109,10 +110,10 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_mem_share)
 
 	/*
 	 * Unmap RX/TX Buffer so mem share is the only reason the FFA_VERSION
-	 * should return the Null version.
+	 * should return the previously negotiated version.
 	 */
 	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_NULL);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_INITIAL);
 
 	/* After reclaiming the memory the FFA_VERSION should now succeed. */
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
@@ -152,10 +153,10 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_mem_lend)
 
 	/*
 	 * Unmap RX/TX buffers so the lend is the only reason FFA_VERSION
-	 * should return the Null version.
+	 * should return the previously negotiated version.
 	 */
 	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_NULL);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_INITIAL);
 
 	/* Reclaiming the memory permits version negotiation again. */
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
@@ -179,10 +180,10 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_mem_borrow)
 
 	/*
 	 * Unmap RX/TX Buffer so memory borrow is the only reason the
-	 * FFA_VERSION should return the Null version.
+	 * FFA_VERSION should return the previously negotiated version.
 	 */
 	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_NULL);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_INITIAL);
 
 	/* Remap the buffers for the relinquish request. */
 	EXPECT_EQ(ffa_rxtx_map((hf_ipaddr_t)SERVICE_SEND_BUFFER(),
@@ -251,11 +252,11 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_notifications_bound)
 		  FFA_SUCCESS_32);
 
 	/*
-	 * Unmap RX/TX Buffer so the existing notification binding is the only
-	 * reason the FFA_VERSION should return the Null version.
+	 * Unmap RX/TX buffers so the notification binding alone keeps the
+	 * framework in use and FFA_VERSION returns the negotiated version.
 	 */
 	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_NULL);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_INITIAL);
 
 	EXPECT_EQ(ffa_notification_unbind(service2_info->vm_id, hf_vm_get_id(),
 					  bitmap)
@@ -280,10 +281,10 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_notifications_pending)
 
 	/*
 	 * Unmap RX/TX Buffer so pending notifications are the only reason the
-	 * FFA_VERSION should return the Null version.
+	 * FFA_VERSION should return the previously negotiated version.
 	 */
 	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_NULL);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_INITIAL);
 
 	ret = ffa_notification_get(hf_vm_get_id(), 0,
 				   FFA_NOTIFICATION_FLAG_BITMAP_SPM |
@@ -323,13 +324,13 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_blocked_call_blocker)
 }
 
 /*
- * Service run on vCPU 1 to observe FFA_VERSION returning the Null version
+ * Service run on vCPU 1 to observe FFA_VERSION returning the negotiated version
  * while vCPU 0 has a blocked FF-A call outstanding, then succeeding once
  * vCPU 0 enters WAITING.
  */
 TEST_SERVICE(ffa_version_negotiate_fwk_in_use_blocked_call_observer)
 {
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_NULL);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_INITIAL);
 
 	ffa_yield();
 

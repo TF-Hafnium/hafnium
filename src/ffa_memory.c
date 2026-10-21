@@ -2317,8 +2317,8 @@ bool ffa_memory_vm_share_outstanding(ffa_id_t id)
 			&share_states.share_states[i];
 
 		/*
-		 * D0234 in the DEN0077A FF-A v1.3 ALP5 specification applies
-		 * only to outstanding lend and share transactions.
+		 * FF-A v1.3 BET0 section 13.2.2.1 counts only outstanding lend
+		 * and share transactions as framework use.
 		 */
 		if (state->memory_region == NULL ||
 		    (state->share_func != FFA_MEM_LEND_32 &&
@@ -2368,8 +2368,8 @@ bool ffa_memory_any_nwd_vm_share_outstanding(void)
 		ffa_id_t sender_id;
 
 		/*
-		 * D0235 in the FF-A v1.3 ALP5 specification requires
-		 * all memory regions shared or lent by any VM to be reclaimed.
+		 * FF-A v1.3 BET0 section 13.2.2.1 requires all memory regions
+		 * shared or lent by any VM to be reclaimed.
 		 */
 		if (state->memory_region == NULL ||
 		    (state->share_func != FFA_MEM_LEND_32 &&

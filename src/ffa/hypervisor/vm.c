@@ -26,7 +26,8 @@ bool ffa_other_world_ffa_in_use(void)
 	/*
 	 * In the Hypervisor build, HF_OTHER_WORLD_ID refers to the secure world
 	 * rather than the Hypervisor's non-secure physical FF-A instance, so
-	 * the SPMC-side FF-A v1.3 ALP5 D0235 aggregation does not exist here.
+	 * the SPMC's Hypervisor framework-use checks described in FF-A v1.3
+	 * BET0 section 13.2.2.1 do not apply here.
 	 */
 	return false;
 }

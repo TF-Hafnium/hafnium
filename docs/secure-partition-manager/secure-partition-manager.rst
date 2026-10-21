@@ -763,12 +763,14 @@ The returned value depends on the caller:
 
 - Hypervisor or OS kernel in NS-EL1/EL2: the SPMD returns the SPMC version
   specified in the SPMC manifest.
-- SP: the SPMC returns its own implemented version.
+- SP: the SPMC returns its own implemented version when negotiation succeeds.
 - SPMC at S-EL1/S-EL2: the SPMD returns its own implemented version.
 
-The FF-A version can only be changed by calls to ``FFA_VERSION`` before other
-calls to other FF-A ABIs have been made. Calls to ``FFA_VERSION`` after
-subsequent ABI calls will fail.
+For a compatible request handled by Hafnium, negotiation is permitted when the
+framework is not in use by the caller. If the framework is in use, Hafnium
+returns the caller's previously negotiated version without changing it. This
+includes requests to downgrade. Negotiation can resume once the framework is no
+longer in use.
 
 FFA_FEATURES
 ~~~~~~~~~~~~

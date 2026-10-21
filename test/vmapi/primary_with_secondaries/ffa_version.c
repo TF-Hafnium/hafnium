@@ -23,8 +23,6 @@
 #include "test/semaphore.h"
 #include "test/vmapi/ffa.h"
 
-#define FFA_VERSION_NULL make_ffa_version(0, 0)
-
 struct ffa_version_secondary_cpu_entry_args {
 	ffa_id_t receiver_id;
 	ffa_vcpu_index_t vcpu_id;
@@ -35,7 +33,8 @@ struct ffa_version_secondary_cpu_entry_args {
 };
 
 /*
- * FFA_VERSION fails for an endpoint when the framework is in use.
+ * FFA_VERSION returns the previously negotiated version while the framework
+ * is in use.
  */
 TEST(ffa_version, ffa_version_negotiate_fwk_in_use_rxtx)
 {
@@ -50,7 +49,8 @@ TEST(ffa_version, ffa_version_negotiate_fwk_in_use_rxtx)
 }
 
 /*
- * FFA_VERSION fails for an endpoint when the framework is in use.
+ * FFA_VERSION returns the previously negotiated version while the framework
+ * is in use.
  */
 TEST(ffa_version, ffa_version_negotiate_fwk_in_use_mem_share)
 {
@@ -65,7 +65,8 @@ TEST(ffa_version, ffa_version_negotiate_fwk_in_use_mem_share)
 }
 
 /*
- * FFA_VERSION fails for an endpoint with an unreclaimed memory lend.
+ * FFA_VERSION returns the previously negotiated version while a memory lend
+ * keeps the framework in use.
  */
 TEST(ffa_version, ffa_version_negotiate_fwk_in_use_mem_lend)
 {
@@ -137,7 +138,8 @@ TEST(ffa_version, ffa_version_negotiate_fwk_in_use_notifications_bound)
 }
 
 /*
- * FFA_VERSION fails for an SP when the framework notifications are pending.
+ * FFA_VERSION returns the previously negotiated version while pending
+ * notifications keep the framework in use.
  */
 TEST(ffa_version, ffa_version_negotiate_fwk_in_use_notifications_pending)
 {

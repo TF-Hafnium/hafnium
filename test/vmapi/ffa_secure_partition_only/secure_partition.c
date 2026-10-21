@@ -1141,3 +1141,31 @@ TEST(ffa_version, fails_minor_version_too_high)
 {
 	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED + 1), FFA_VERSION_COMPILED);
 }
+
+/**
+ * A compatible version request does not change the negotiated version while
+ * RX/TX buffers are mapped. Negotiation can resume after they are unmapped.
+ */
+TEST_PRECONDITION(ffa_version, preserves_version_while_rxtx_mapped,
+		  v1_2_or_later)
+{
+	/* Establish a known version before placing the framework in use. */
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2), FFA_VERSION_COMPILED);
+	ASSERT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+
+	/* A downgrade is a no-op, and a subsequent request sees v1.2. */
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_1), FFA_VERSION_1_2);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2), FFA_VERSION_1_2);
+	ASSERT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+
+	/* After unmapping, the downgrade takes effect. */
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_1), FFA_VERSION_COMPILED);
+	ASSERT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2), FFA_VERSION_1_1);
+	ASSERT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+
+	/* Restore the manifest version for any subsequent tests. */
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2), FFA_VERSION_COMPILED);
+}
