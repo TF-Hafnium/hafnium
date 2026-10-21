@@ -1215,19 +1215,17 @@ TEST(ffa_version, negotiate)
 			  VERSION_QUERY_NEGOTIATE),
 		  SMCCC_INVALID_PARAMETER);
 	/*
-	 * Exercise the scenario described by Bullet 4 of Rule 0238 in v1.3 ALP5
-	 * spec: If the callee only implements a version that is incompatible
-	 * and higher than input version number, the lowest incompabtible
-	 * version should be returned.
+	 * FF-A v1.3 BET0 section 13.2.2.1: If the callee only implements a
+	 * version incompatible with and higher than the input version, the
+	 * lowest incompatible version should be returned.
 	 */
 	EXPECT_EQ(ffa_version(make_ffa_version(0, 1), VERSION_QUERY_NEGOTIATE),
 		  FFA_VERSION_1_0);
 	/*
-	 * Exercise the scenario described by Bullet 3 of Rule 0238 in v1.3 ALP5
-	 * spec: If the callee only implements a version that is incompatible
-	 * and lower than input version number, the highest incompabtible
-	 * version should be returned. Test both incompatible major or minor
-	 * versions.
+	 * FF-A v1.3 BET0 section 13.2.2.1: If the callee only implements a
+	 * version incompatible with and lower than the input version, the
+	 * highest incompatible version should be returned. Test both
+	 * incompatible major and minor versions.
 	 */
 	EXPECT_EQ(ffa_version(make_ffa_version(2, 0), VERSION_QUERY_NEGOTIATE),
 		  FFA_VERSION_COMPILED);
@@ -1295,7 +1293,6 @@ TEST(ffa_version, compat_check)
 TEST(ffa_version, compat_check_succeeds_when_framework_in_use_rxtx_buffer)
 {
 	const enum ffa_version initial_version = FFA_VERSION_1_3;
-	const enum ffa_version null_version = make_ffa_version(0, 0);
 
 	EXPECT_EQ(ffa_version(0, VERSION_QUERY_GET_NEGOTIATED),
 		  initial_version);
@@ -1307,6 +1304,66 @@ TEST(ffa_version, compat_check_succeeds_when_framework_in_use_rxtx_buffer)
 	EXPECT_EQ(ffa_version(0, VERSION_QUERY_GET_NEGOTIATED),
 		  initial_version);
 	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
-		  null_version);
+		  initial_version);
+	/* A downgrade request is a no-op while FF-A is in use. */
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_1, VERSION_QUERY_NEGOTIATE),
+		  initial_version);
+	EXPECT_EQ(ffa_version(0, VERSION_QUERY_GET_NEGOTIATED),
+		  initial_version);
+	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+}
+
+TEST_PRECONDITION(ffa_version, downgrade_after_framework_use_ends,
+		  v1_3_or_later)
+{
+	/* The manifest starts this partition at v1.3. */
+	EXPECT_EQ(ffa_version(0, VERSION_QUERY_GET_NEGOTIATED),
+		  FFA_VERSION_1_3);
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_1, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_1_3);
+	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+
+	/* Hafnium returns its version but stores the input version. */
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_1, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(0, VERSION_QUERY_GET_NEGOTIATED),
+		  FFA_VERSION_1_1);
+}
+
+TEST_PRECONDITION(ffa_version,
+		  legacy_caller_does_not_receive_null_when_framework_in_use,
+		  v1_3_or_later)
+{
+	const enum ffa_version negotiated_version = FFA_VERSION_1_1;
+
+	EXPECT_EQ(ffa_version(negotiated_version, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_version(negotiated_version, VERSION_QUERY_NEGOTIATE),
+		  negotiated_version);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2, VERSION_QUERY_NEGOTIATE),
+		  negotiated_version);
+	EXPECT_EQ(ffa_version(0, VERSION_QUERY_GET_NEGOTIATED),
+		  negotiated_version);
+	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+}
+
+TEST_PRECONDITION(ffa_version,
+		  legacy_caller_cannot_downgrade_when_framework_in_use,
+		  v1_3_or_later)
+{
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_1_2);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_1, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_1_2);
+	EXPECT_EQ(ffa_version(0, VERSION_QUERY_GET_NEGOTIATED),
+		  FFA_VERSION_1_2);
 	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
 }

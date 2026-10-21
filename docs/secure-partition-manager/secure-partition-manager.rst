@@ -789,8 +789,12 @@ implemented version without changing the negotiated version. Callers must
 therefore check compatibility before treating a negotiation response as successful.
 
 Negotiation is permitted only while the framework is not in use by the caller.
-If the requested version is compatible but the framework is in use, Hafnium
-returns the Null version (zero) and leaves the negotiated version unchanged.
+If the requested version is compatible but the framework is in use, negotiation
+is a no-op. Hafnium returns the caller's previously negotiated version, and the
+stored negotiated version remains unchanged, including when the caller requests
+a downgrade. Because a successful negotiation and an in-use no-op can return
+the same output version, an FF-A v1.3 caller can query the negotiated version
+to determine whether the requested version was recorded.
 Compatibility and negotiated-version queries remain available while the
 framework is in use.
 

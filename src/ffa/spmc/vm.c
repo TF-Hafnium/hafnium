@@ -120,7 +120,7 @@ out:
 }
 
 /**
- * As defined in D0235 of the FF-A v1.3 ALP5 specification, this helper checks
+ * As defined in FF-A v1.3 BET0 section 13.2.2.1, this helper checks
  * whether the framework is in use by the Hypervisor because any of the
  * following are true:
  *   - Any VM still has RX/TX buffers mapped in the SPMC's translation regime.
@@ -180,7 +180,7 @@ static bool any_sp_has_vm_notifications_bound(void)
 }
 
 /**
- * As defined in D0235 of the FF-A v1.3 ALP5 specification, the
+ * As defined in FF-A v1.3 BET0 section 13.2.2.1, the
  * framework is in use by the Hypervisor if any of the following are
  * true:
  *   - The Hypervisor RX/TX buffers are mapped.
@@ -196,9 +196,10 @@ static bool any_sp_has_vm_notifications_bound(void)
  * SP vCPU states approximate outstanding invocations; physical
  * Hypervisor vCPU states track world switches, so the same check does
  * not apply. In this case we rely on Hypervisor serialization
- * (FF-A v1.3 ALP5 X0240) and check only known persistent framework use.
+ * (FF-A v1.3 BET0 section 13.2.2.1) and check only known persistent
+ * framework use.
  * Concurrent use during negotiation has CONSTRAINED UNPREDICTABLE
- * results (FF-A v1.3 ALP5 R0239).
+ * results (FF-A v1.3 BET0 section 13.2.2.1).
  */
 bool ffa_other_world_ffa_in_use(void)
 {

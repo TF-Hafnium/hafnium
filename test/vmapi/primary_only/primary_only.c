@@ -192,21 +192,19 @@ TEST(ffa, ffa_version_negotiate)
 			      VERSION_QUERY_NEGOTIATE),
 		  current_version);
 	/*
-	 * Exercise the scenario described by Bullet 4 of Rule 0238 in v1.3 ALP5
-	 * spec: If the callee only implements a version that is incompatible
-	 * and higher than input version number, the lowest incompatible
-	 * version should be returned.
+	 * FF-A v1.3 BET0 section 13.2.2.1: If the callee only implements a
+	 * version incompatible with and higher than the input version, the
+	 * lowest incompatible version should be returned.
 	 */
 	EXPECT_EQ(ffa_version(0x0, VERSION_QUERY_NEGOTIATE), FFA_VERSION_1_0);
 	EXPECT_EQ(ffa_version(0x1, VERSION_QUERY_NEGOTIATE), FFA_VERSION_1_0);
 	EXPECT_EQ(ffa_version(0xffff, VERSION_QUERY_NEGOTIATE),
 		  FFA_VERSION_1_0);
 	/*
-	 * Exercise the scenario described by Bullet 3 of Rule 0238 in v1.3 ALP5
-	 * spec: If the callee only implements a version that is incompatible
-	 * and lower than input version number, the highest incompatible
-	 * version should be returned. Test both incompatible major or minor
-	 * versions.
+	 * FF-A v1.3 BET0 section 13.2.2.1: If the callee only implements a
+	 * version incompatible with and lower than the input version, the
+	 * highest incompatible version should be returned. Test both
+	 * incompatible major and minor versions.
 	 */
 	EXPECT_EQ(
 		ffa_version(FFA_VERSION_COMPILED + 1, VERSION_QUERY_NEGOTIATE),

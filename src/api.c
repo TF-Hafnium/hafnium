@@ -2650,7 +2650,7 @@ uint32_t api_interrupt_get(struct vcpu_locked current_locked)
 }
 
 /**
- * As defined in 13.2.2.1 of the FF-A v1.3 ALP5 specification,
+ * As defined in FF-A v1.3 BET0 section 13.2.2.1,
  * the Framework is in use by a partition if any of the following are true:
  *   - The RX/TX buffers of the partition are mapped.
  *   - VM or SP notifications of the partition are bound.
@@ -2694,7 +2694,7 @@ static bool ffa_version_get_compatibility_response(
 			compiled_minor);
 		if (requested_major < ffa_version_get_major(FFA_VERSION_1_0)) {
 			/*
-			 * Per rule R0238 in DEN0077A FF-A v1.3 ALP5, if the
+			 * Per FF-A v1.3 BET0 section 13.2.2.1, if the
 			 * SPMC only implements a version higher than the
 			 * requested version, return the lowest incompatible
 			 * version.
@@ -2702,7 +2702,7 @@ static bool ffa_version_get_compatibility_response(
 			*ret = (struct ffa_value){.func = FFA_VERSION_1_0};
 		} else {
 			/*
-			 * Per rule R0238 in DEN0077A FF-A v1.3 ALP5, if the
+			 * Per FF-A v1.3 BET0 section 13.2.2.1, if the
 			 * SPMC only implements a version lower than the
 			 * requested version, return the highest incompatible
 			 * version.
@@ -2727,8 +2727,9 @@ static bool ffa_version_get_compatibility_response(
  * query returns the caller's currently negotiated version.
  * Returns the closest implemented version if the requested version is
  * incompatible. Returns `SMCCC_INVALID_PARAMETER` if the version or input
- * flags are invalid. Returns the Null version if renegotiation is denied
- * because the framework is already in use by the caller.
+ * flags are invalid. If the framework is already in use, negotiation is a
+ * no-op: it returns the caller's previously negotiated version without
+ * changing the stored negotiated version.
  */
 struct ffa_value api_ffa_version(struct vcpu *current,
 				 enum ffa_version requested_version,
@@ -2739,9 +2740,6 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 
 	const struct ffa_value invalid_parameter = {
 		.func = SMCCC_INVALID_PARAMETER,
-	};
-	const struct ffa_value null_version = {
-		.func = make_ffa_version(0, 0),
 	};
 	struct vm_locked current_vm_locked;
 	enum version_query_type query_type = (enum version_query_type)(
@@ -2806,12 +2804,13 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 			}
 
 			if (in_use) {
+				struct ffa_value negotiated_version = {
+					.func = current_vm_locked.vm
+							->ffa_version,
+				};
+
 				vm_unlock(&current_vm_locked);
-				dlog_error(
-					"FFA_VERSION: Framework in use, "
-					"returning NULL "
-					"version\n");
-				return null_version;
+				return negotiated_version;
 			}
 
 			current_vm_locked.vm->ffa_version = requested_version;
