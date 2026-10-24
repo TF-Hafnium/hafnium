@@ -3,6 +3,34 @@
 This document contains a summary of the new features, changes, fixes and known
 issues in each release of Hafnium.
 
+## [2.14.2](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/refs/tags/lts-v2.14.1..refs/tags/lts-v2.14.2) (2026-10-24)
+
+
+### Bug Fixes
+
+* **ff-a:** bound RXTX descriptor offsets to the mailbox buffer ([a7ff91e](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/a7ff91ee57959908b6b1182233f04a2fe82f973d))
+* **ff-a:** check header size before iterating receivers ([4ef523d](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/4ef523dff8c4d51c25d8d1fec73a979a93c03d76))
+* **ff-a:** free memory-send descriptor copy on early failure ([93e77cf](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/93e77cfd058250f846ca703fe37be60bcc246f41))
+* **ff-a:** prevent receiver array bounds overflow ([f555879](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/f55587949cfa56cef4ff41e1ee121e2ab26cc1c2))
+* **ff-a:** reject transaction fragments shorter than the header ([184c30b](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/184c30bd873424c700d915e5dd011faf3be50195))
+* **ff-a:** skip incomplete shares in NS_RES_INFO_GET ([957bb2f](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/957bb2fb80524b505cea64cd23f96a55283102b4))
+* **ff-a:** traverse all fragments in NS_RES_INFO_GET ([7901041](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/79010411aa2f8f8aad6ef305d537311356a71f42))
+* **ff-a:** unlock other-world VM on RXTX unmap remap failure ([16d6eb2](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/16d6eb271ed6c88d4700e05b0a7f94363455ef10))
+* **lifecycle:** don't double-unlock current vCPU in msg_wait_prepare ([c8ec4f6](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/c8ec4f60271cd507d6f082d81edfa56fc2db71ec))
+* **notifications:** reject unknown notification receiver ([32166bf](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/32166bf6f52f6fc067f6cff4d696544375f05102))
+
+
+### Tests & Framework
+
+* **ff-a:** cover non-contiguous NS_RES_INFO_GET fragments ([4d99147](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/4d9914736e4873eedd3bde70e4d0cfc156e99861))
+
+
+### Documentation
+
+* **process:** document LTS candidate trailer ([305b453](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/305b45358c10043f5597292dfbebeb21771e83cf))
+* **security:** add advisory for FFA_NS_RES_INFO_GET handling ([f478428](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/f478428ea8242b4153a9b81607f85999242b4e23))
+* **security:** add advisory for receiver bounds overflow ([ee9df02](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/ee9df02e5889dd2541a757feab1265f72b8887bd))
+
 ## [2.14.1](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/refs/tags/lts-v2.14.0..refs/tags/lts-v2.14.1) (2026-07-03)
 
 
