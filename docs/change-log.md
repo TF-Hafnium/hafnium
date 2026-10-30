@@ -3,6 +3,33 @@
 This document contains a summary of the new features, changes, fixes and known
 issues in each release of Hafnium.
 
+## [2.14.3](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/refs/tags/lts-v2.14.2..refs/tags/lts-v2.14.3) (2026-10-30)
+
+
+### Features
+
+* **ff-a:** gate FFA_VERSION on framework use ([8c88b39](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/8c88b3983649587710a3b1048fb0a915287f2c9e))
+* **ff-a:** return compatible FFA_VERSION ([dd6cb4d](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/dd6cb4d5e13fe5a2f6b15f2e98cfcd0499577adb))
+* **ff-a:** track Hypervisor framework use ([0ba5c66](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/0ba5c6675acdcc8e9d8fd35e4198cc3fe62c246c))
+* **ff-a:** track outstanding partition FF-A invocations ([423229c](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/423229c62425def2ec214275cbb63435179a99db))
+
+
+### Bug Fixes
+
+* **ff-a:** fix NULL deref and lock leak in api_ffa_rx_acquire ([599826c](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/599826c7d31db7f947f7f817c7cd6c2781a14810))
+* **ff-a:** return negotiated version while framework is in use ([f805869](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/f80586902d2038c3cd1726d30b2bcdf68f80d0fe))
+* **ff-a:** use SMCCC return codes for FFA_VERSION ([643ac8d](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/643ac8d61784fa69c2dfbf868beae43a00c11a7e))
+* **interrupts:** avoid double-unlock on self-targeted SP IRQs ([8c5aa08](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/8c5aa082eed784ff95d8cc6c2baa8a5b468db0df))
+
+
+### Tests & Framework
+
+* **ff-a:** clean up FFA_VERSION tests ([1f62837](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/1f628370bcd0ba31d029b65482167d2f3126a562))
+* **ff-a:** enable notifications for EL0 partition ([065f9ca](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/065f9caa4f90bfda8e81d608665a46a7190b5f5a))
+* **ff-a:** test FFA_VERSION framework use ([073f650](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/073f650deb678cb6ec92f91251f81aa5c68526a1))
+* **ff-a:** test outstanding FF-A calls ([c9c3e69](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/c9c3e695e0d631fdb229a0265232e3e5ac09f8f8))
+* **interrupts:** cover self-targeted running-vCPU IPI path ([bfdc6dc](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/bfdc6dc00f59d52ad9c375dc512c6fb3e1764324))
+
 ## [2.14.2](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/refs/tags/lts-v2.14.1..refs/tags/lts-v2.14.2) (2026-10-24)
 
 
